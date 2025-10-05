@@ -1,0 +1,34 @@
+# Finance Angle Codex Rule
+
+## Project Snapshot
+- Kotlin + Spring Boot service that logs daily spend, receipt ingestions, and savings snapshots.
+- Postgres is the canonical store; AI assists with parsing receipts/voice and generating summaries.
+
+## Behaviour Expectations
+- Stay aligned with `docs/product-context.md`, `docs/agents.md`, and `docs/project-plan.md`.
+- Default currency is EUR; do not drop or assume other currencies unless requirements change.
+- Keep photo/audio artifacts on client devices; server receives metadata only.
+- Log traceable actions: include agent identifiers on writes and preserve audit trails.
+
+## Coding Standards
+- Kotlin 1.9+, Spring Boot 3.x, Gradle wrapper, Java 21 target.
+- Enforce validation on DTOs (amount > 0, category required, timestamps present).
+- Write unit and integration tests (JUnit 5, MockK, Testcontainers) for new behaviour.
+- Use package-by-domain structure (`transactions`, `receipts`, `savings`, `insights`).
+
+## Preferred Workflows
+- Dev setup: export SPRING_DATASOURCE_* vars, run `./gradlew bootRun`.
+- Health check: `GET /actuator/health` or `GET /api/transactions/summary`.
+- Database migrations via Flyway/Liquibase before touching persistence models.
+- When unsure about AI parsing confidence, escalate to human instead of guessing.
+
+## Guardrails
+- Never commit secrets or real artifacts; redact sensitive info in logs and docs.
+- Avoid destructive DB operations outside migrations; prefer schema migrations over manual DDL.
+- Respect existing docs: update `docs/agents.md` when behaviour or APIs change.
+- Escalate on conflicting data (e.g., mismatched receipt totals) or missing categories.
+
+## Communication & Updates
+- Keep doc updates in `docs/` directory; sync backlog changes via `docs/requirements-and-tasks.md`.
+- Note open questions in docs so humans can resolve (retention policy, category customization, etc.).
+- For large changes, summarize impact in PR description and link to relevant doc sections.

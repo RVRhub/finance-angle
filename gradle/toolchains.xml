@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<toolchains>
+  <toolchain>
+    <type>jdk</type>
+    <provides>
+      <version>21</version>
+      <vendor>Eclipse Temurin</vendor>
+    </provides>
+    <configuration>
+      <jdkHome>/Users/rvr/Library/Java/JavaVirtualMachines/openjdk-21.0.2/Contents/Home</jdkHome>
+    </configuration>
+  </toolchain>
+</toolchains>

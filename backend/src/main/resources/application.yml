@@ -1,0 +1,28 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/finance_angle}
+    username: ${SPRING_DATASOURCE_USERNAME:finance_angle}
+    password: ${SPRING_DATASOURCE_PASSWORD:finance_angle}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: ${SERVER_PORT:8080}
+
+logging:
+  level:
+    org.springframework: INFO
+    com.financeangle: DEBUG
+
+finance-angle:
+  ai:
+    provider: noop
+    recommendation-temperature: 0.2
