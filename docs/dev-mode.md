@@ -11,26 +11,100 @@ This guide explains how to connect the Finance Angle backend to ChatGPT Dev Mode
 ```bash
 docker compose up --build db app
 ```
-This command launches Postgres (`db`) and the Spring Boot API (`app`). Wait for the logs to show `Started FinanceAngleApplication` before continuing.
+This launches Postgres (`db`) and the Spring Boot API (`app`). Wait until the app reports `Started FinanceAngleApplication` and Flyway has applied migrations.
 
-## 2. Launch the MCP bridge on demand
-When Dev Mode starts a session, it must run the MCP server as a process with STDIN/STDOUT attached. Use Docker Compose to spin up a disposable container that connects to the already running backend:
+## 2. Run the MCP bridge locally
+The bridge lives in `mcp-server`. Build it once:
 ```bash
-docker compose run --rm mcp
+./gradlew :mcp-server:installDist
 ```
-Keep this command handy; ChatGPT Dev Mode can be configured to run it automatically for each session.
+Then start it (in another terminal) with logging enabled:
+```bash
+MCP_LOG_LEVEL=DEBUG \
+FINANCE_ANGLE_BASE_URL=http://localhost:8080 \
+mcp-server/build/install/mcp-server/bin/mcp-server
+```
+Leave this running while you test; it prints JSON-RPC logs to stderr and emits responses to stdout.
 
-## 3. Configure Dev Mode (ChatGPT UI)
+### Quick local sanity check (optional)
+Use the shell snippet below to send the canonical `initialize` and `tools/list` requests via stdio:
+```bash
+coproc MCP (MCP_LOG_LEVEL=INFO FINANCE_ANGLE_BASE_URL=http://localhost:8080 \
+            mcp-server/build/install/mcp-server/bin/mcp-server)
+
+send_rpc() {
+  local json="$1"
+  local bytes=${#json}
+  printf 'Content-Length: %d\r\n\r\n%s' "$bytes" "$json" >&${MCP[1]}
+}
+
+read_rpc() {
+  local header line
+  while IFS= read -r -u ${MCP[0]} line; do
+    header+="$line"$'\n'
+    [[ "$line" == $'\r' ]] && break
+  done
+  local length=$(echo "$header" | awk -F': ' 'BEGIN{IGNORECASE=1}/Content-Length/{print $2}')
+  IFS= read -r -N "${length%$'\r'}" -u ${MCP[0]} body
+  echo "$body"
+}
+
+send_rpc '{"jsonrpc":"2.0","id":1,"method":"initialize"}'
+read_rpc
+send_rpc '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+read_rpc
+
+kill ${MCP_PID:-${MCP[0]}}
+```
+You should see the server metadata plus a list of tools (e.g., `createTransaction`, `registerReceipt`).
+
+## 3. Attach the bridge to Dev Mode (ChatGPT UI)
 1. Open the Dev Mode sidebar → **Add MCP Server**.
-2. For **Command**, use `docker compose run --rm mcp`.
-3. Optionally supply environment variables if you run the backend elsewhere:
+2. Enter a descriptive name (e.g., “Finance Angle MCP”).
+3. Provide the command ChatGPT should execute for each session. Two common options:
+   - **Direct binary (local CLI session):** `mcp-server/build/install/mcp-server/bin/mcp-server`
+   - **Docker wrapper (containerised):** `docker compose run --rm mcp`
+4. Set environment variables if the backend runs at a non-default location:
    - `FINANCE_ANGLE_BASE_URL=http://host.docker.internal:8080`
-4. Save the server. ChatGPT now discovers the exposed tools (`createTransaction`, `registerReceipt`, etc.) and can call them during conversations.
+   - `MCP_LOG_LEVEL=INFO`
+5. Save. Dev Mode will probe the bridge and show the available tools when successful.
 
-## 4. Test the workflow
+## 4. Test the workflow end-to-end
 1. Start a Dev Mode chat and invoke the `createTransaction` tool manually to verify connectivity.
 2. Provide a natural-language instruction (e.g., "Log yesterday's grocery run for 24.50 EUR"). The GPT should confirm details then call the tool.
 3. Check backend logs (`docker compose logs -f app`) to confirm the request arrived.
+
+## 5. Optional: Expose the bridge to Custom GPTs
+To call the same MCP tools from a Custom GPT instead of Dev Mode:
+1. Expose the bridge via a tunnel (`ssh -R`, `cloudflared`, `ngrok`, etc.) and note the public URL.
+2. In the Custom GPT builder → **Actions** → **Add Action** → **Model Context Protocol**, supply the tunneled endpoint and any required headers.
+3. Reuse the environment variables above so the bridge points at the correct backend.
+4. Save and test the action inside the custom GPT chat.
+
+## 6. HTTP mode (for MCP Server URL workflows)
+If you prefer to connect through an HTTP endpoint—useful when Dev Mode isn’t available—run the MCP bridge with the bundled HTTP wrapper:
+
+```bash
+./gradlew :mcp-server:installDist
+MCP_HTTP_PORT=3333 \
+FINANCE_ANGLE_BASE_URL=http://localhost:8080 \
+mcp-server/build/install/mcp-server/bin/http-mcp-server
+```
+
+The server exposes:
+- `GET /health` – simple liveness check (`200 ok`).
+- `POST /` – JSON-RPC 2.0 requests with the same payloads as the stdio transport.
+
+To share it with ChatGPT:
+1. Tunnel the port (example with ngrok):
+   ```bash
+   ngrok http 3333
+   ```
+2. Copy the HTTPS forwarding URL.
+3. In the Custom GPT builder → **Actions** → **Add Action** → **Model Context Protocol**, paste the URL into **Server URL**.
+4. Set `FINANCE_ANGLE_BASE_URL` in the "Environment Variables" UI so the bridge resolves backend requests correctly.
+
+ChatGPT now calls the HTTP endpoint directly without needing Dev Mode. Logs still stream to stderr; set `MCP_LOG_LEVEL=DEBUG` when diagnosing issues.
 
 ## Notes
 - The MCP server is stateless; stop the container after each session.

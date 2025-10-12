@@ -7,7 +7,9 @@ spring:
   jpa:
     database-platform: org.hibernate.dialect.PostgreSQLDialect
     hibernate:
-      ddl-auto: none
+      ddl-auto: create-drop
+  flyway:
+    enabled: false
   sql:
     init:
       mode: never

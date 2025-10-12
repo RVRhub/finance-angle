@@ -7,6 +7,8 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import java.io.ByteArrayOutputStream
 import java.io.EOFException
 import java.io.InputStream
+import java.io.OutputStream
+import java.io.PrintStream
 import java.net.URI
 import java.net.URLEncoder
 import java.net.http.HttpClient
@@ -19,38 +21,63 @@ fun main() {
     McpServer().start()
 }
 
-class McpServer {
-    private val objectMapper: ObjectMapper = jacksonObjectMapper()
+class McpServer(
+    private val input: InputStream = System.`in`,
+    private val output: OutputStream = System.out,
+    private val errorStream: PrintStream = System.err,
+    private val objectMapper: ObjectMapper = jacksonObjectMapper(),
     private val httpClient: HttpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(5))
-        .build()
-    private val backendBaseUrl: String = (System.getenv("FINANCE_ANGLE_BASE_URL") ?: "http://app:8080").trimEnd('/')
+        .build(),
+    baseUrl: String? = System.getenv("FINANCE_ANGLE_BASE_URL"),
+    private val logLevel: LogLevel = LogLevel.fromEnv(System.getenv("MCP_LOG_LEVEL"))
+) {
+    private val backendBaseUrl: String = (baseUrl ?: "http://localhost:8080").trimEnd('/')
 
     private val tools: Map<String, ToolDefinition> = buildToolsMap()
 
     fun start() {
-        val input = System.`in`
+        logInfo("MCP server starting. Backend base URL: $backendBaseUrl")
         while (true) {
             val request = try {
                 readRequest(input) ?: break
             } catch (e: EOFException) {
+                logInfo("EOF reached. Shutting down MCP server.")
                 break
             } catch (e: Exception) {
-                System.err.println("Failed to read request: ${e.message}")
+                logError("Failed to read request", e)
                 continue
             }
-            try {
-                handleRequest(request)
+            logDebug("Incoming request: method=${request.method}, id=${request.id}")
+            val envelope = try {
+                processRequest(request)
             } catch (e: Exception) {
-                System.err.println("Error handling request: ${e.message}")
-                sendError(request.id, message = e.message ?: "Unhandled error")
+                logError("Error handling request ${request.method}", e)
+                errorEnvelope(request.id, message = e.message ?: "Unhandled error")
             }
+            writeMessage(envelope)
         }
     }
 
-    private fun handleRequest(request: JsonRpcRequest) {
-        when (request.method) {
-            "initialize" -> sendResponse(
+    fun processRawJson(json: String): ObjectNode {
+        val request = try {
+            objectMapper.readValue(json, JsonRpcRequest::class.java)
+        } catch (e: Exception) {
+            logError("Failed to parse JSON-RPC payload", e)
+            return errorEnvelope(null, code = -32700, message = "Invalid JSON")
+        }
+        logDebug("Incoming request: method=${request.method}, id=${request.id}")
+        return try {
+            processRequest(request)
+        } catch (e: Exception) {
+            logError("Error handling request ${request.method}", e)
+            errorEnvelope(request.id, message = e.message ?: "Unhandled error")
+        }
+    }
+
+    private fun processRequest(request: JsonRpcRequest): ObjectNode {
+        return when (request.method) {
+            "initialize" -> successEnvelope(
                 request.id,
                 objectMapper.createObjectNode().apply {
                     put("protocolVersion", "1.0")
@@ -69,9 +96,9 @@ class McpServer {
                 }
             )
 
-            "ping" -> sendResponse(request.id, objectMapper.createObjectNode())
+            "ping" -> successEnvelope(request.id, objectMapper.createObjectNode())
 
-            "tools/list" -> sendResponse(
+            "tools/list" -> successEnvelope(
                 request.id,
                 objectMapper.createObjectNode().apply {
                     putNull("cursor")
@@ -82,32 +109,33 @@ class McpServer {
 
             "tools/call" -> handleToolCall(request)
 
-            else -> sendError(request.id, code = -32601, message = "Method ${request.method} not implemented")
+            else -> errorEnvelope(request.id, code = -32601, message = "Method ${request.method} not implemented")
         }
     }
 
-    private fun handleToolCall(request: JsonRpcRequest) {
+    private fun handleToolCall(request: JsonRpcRequest): ObjectNode {
         val paramsNode = request.params
         if (paramsNode == null || !paramsNode.isObject) {
-            sendError(request.id, message = "Invalid params for tools/call")
-            return
+            return errorEnvelope(request.id, message = "Invalid params for tools/call")
         }
         val toolName = paramsNode.get("toolName")?.asText()
         if (toolName.isNullOrBlank()) {
-            sendError(request.id, message = "toolName is required for tools/call")
-            return
+            return errorEnvelope(request.id, message = "toolName is required for tools/call")
         }
         val tool = tools[toolName]
         if (tool == null) {
-            sendError(request.id, message = "Unknown tool $toolName")
-            return
+            logWarn("Unknown tool requested: $toolName")
+            return errorEnvelope(request.id, message = "Unknown tool $toolName")
         }
         val argsNode = paramsNode.get("arguments")
         try {
+            logDebug("Executing tool $toolName")
             val result = tool.handler.invoke(argsNode)
-            sendResponse(request.id, objectMapper.valueToTree(result))
+            logDebug("Tool $toolName completed successfully")
+            return successEnvelope(request.id, objectMapper.valueToTree(result))
         } catch (e: Exception) {
-            sendError(request.id, message = e.message ?: "Tool execution failed")
+            logError("Tool $toolName execution failed", e)
+            return errorEnvelope(request.id, message = e.message ?: "Tool execution failed")
         }
     }
 
@@ -423,8 +451,8 @@ class McpServer {
         return ToolCallResult(content = listOf(TextContent(text = objectMapper.writeValueAsString(node))))
     }
 
-    private fun sendResponse(id: JsonNode?, result: JsonNode) {
-        val envelope = objectMapper.createObjectNode().apply {
+    private fun successEnvelope(id: JsonNode?, result: JsonNode): ObjectNode {
+        return objectMapper.createObjectNode().apply {
             put("jsonrpc", "2.0")
             if (id != null && !id.isNull) {
                 set<JsonNode>("id", id)
@@ -433,11 +461,10 @@ class McpServer {
             }
             set<JsonNode>("result", result)
         }
-        writeMessage(envelope)
     }
 
-    private fun sendError(id: JsonNode?, code: Int = -32000, message: String, data: String? = null) {
-        val envelope = objectMapper.createObjectNode().apply {
+    private fun errorEnvelope(id: JsonNode?, code: Int = -32000, message: String, data: String? = null): ObjectNode {
+        return objectMapper.createObjectNode().apply {
             put("jsonrpc", "2.0")
             if (id != null && !id.isNull) {
                 set<JsonNode>("id", id)
@@ -452,16 +479,15 @@ class McpServer {
                 }
             })
         }
-        writeMessage(envelope)
     }
 
     private fun writeMessage(node: JsonNode) {
         val payload = objectMapper.writeValueAsBytes(node)
         val header = "Content-Length: ${payload.size}\r\n\r\n"
-        val out = System.out
-        out.write(header.toByteArray(StandardCharsets.UTF_8))
-        out.write(payload)
-        out.flush()
+        output.write(header.toByteArray(StandardCharsets.UTF_8))
+        output.write(payload)
+        output.flush()
+        logDebug("Response sent (${payload.size} bytes)")
     }
 
     private fun readRequest(input: InputStream): JsonRpcRequest? {
@@ -531,6 +557,7 @@ class McpServer {
     }
 
     private fun sendJsonRequest(request: HttpRequest): HttpJsonResponse {
+        logDebug("HTTP ${request.method()} ${request.uri()}")
         val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
         val bodyText = response.body()
         val bodyNode = try {
@@ -538,7 +565,52 @@ class McpServer {
         } catch (e: Exception) {
             null
         }
+        logDebug("HTTP response ${response.statusCode()} for ${request.uri()}")
         return HttpJsonResponse(response.statusCode(), bodyNode, bodyText)
+    }
+
+    private fun logDebug(message: String) {
+        if (logLevel.priority <= LogLevel.DEBUG.priority) {
+            errorStream.println("[DEBUG] $message")
+        }
+    }
+
+    private fun logInfo(message: String) {
+        if (logLevel.priority <= LogLevel.INFO.priority) {
+            errorStream.println("[INFO] $message")
+        }
+    }
+
+    private fun logWarn(message: String) {
+        if (logLevel.priority <= LogLevel.WARN.priority) {
+            errorStream.println("[WARN] $message")
+        }
+    }
+
+    private fun logError(message: String, throwable: Throwable) {
+        if (logLevel.priority <= LogLevel.ERROR.priority) {
+            errorStream.println("[ERROR] $message: ${throwable.message}")
+            throwable.printStackTrace(errorStream)
+        }
+    }
+}
+
+enum class LogLevel(val priority: Int) {
+    DEBUG(10),
+    INFO(20),
+    WARN(30),
+    ERROR(40);
+
+    companion object {
+        fun fromEnv(value: String?): LogLevel {
+            return when (value?.uppercase()) {
+                "DEBUG" -> DEBUG
+                "INFO" -> INFO
+                "WARN" -> WARN
+                "ERROR" -> ERROR
+                else -> INFO
+            }
+        }
     }
 }
 

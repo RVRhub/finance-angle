@@ -13,6 +13,8 @@ import jakarta.persistence.OneToOne
 import jakarta.persistence.PrePersist
 import jakarta.persistence.PreUpdate
 import jakarta.persistence.Table
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 import java.time.Instant
 
 @Entity
@@ -36,7 +38,8 @@ class ReceiptIngestionEntity(
     @JoinColumn(name = "transaction_id")
     var transaction: TransactionEntity? = null,
 
-    @Column(name = "metadata", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "metadata")
     var metadata: String? = null,
 
     @Column(name = "created_at", nullable = false, updatable = false)
