@@ -59,6 +59,8 @@ class McpServer(
         }
     }
 
+    fun currentBackendBaseUrl(): String = backendBaseUrl
+
     fun processRawJson(json: String): ObjectNode {
         val request = try {
             objectMapper.readValue(json, JsonRpcRequest::class.java)
@@ -571,28 +573,30 @@ class McpServer(
 
     private fun logDebug(message: String) {
         if (logLevel.priority <= LogLevel.DEBUG.priority) {
-            errorStream.println("[DEBUG] $message")
+            errorStream.println("${timestamp()}[DEBUG][stdio] $message")
         }
     }
 
     private fun logInfo(message: String) {
         if (logLevel.priority <= LogLevel.INFO.priority) {
-            errorStream.println("[INFO] $message")
+            errorStream.println("${timestamp()}[INFO][stdio] $message")
         }
     }
 
     private fun logWarn(message: String) {
         if (logLevel.priority <= LogLevel.WARN.priority) {
-            errorStream.println("[WARN] $message")
+            errorStream.println("${timestamp()}[WARN][stdio] $message")
         }
     }
 
     private fun logError(message: String, throwable: Throwable) {
         if (logLevel.priority <= LogLevel.ERROR.priority) {
-            errorStream.println("[ERROR] $message: ${throwable.message}")
+            errorStream.println("${timestamp()}[ERROR][stdio] $message: ${throwable.message}")
             throwable.printStackTrace(errorStream)
         }
     }
+
+    private fun timestamp(): String = "[${java.time.Instant.now()}]"
 }
 
 enum class LogLevel(val priority: Int) {

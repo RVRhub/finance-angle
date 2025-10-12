@@ -96,13 +96,53 @@ The server exposes:
 - `POST /` – JSON-RPC 2.0 requests with the same payloads as the stdio transport.
 
 To share it with ChatGPT:
-1. Tunnel the port (example with ngrok):
+1. Tunnel the port with ngrok (requires a free ngrok account/token):
    ```bash
    ngrok http 3333
    ```
+   ngrok prints an HTTPS forwarding URL (for example `https://abcd-1-2-3-4.ngrok-free.app`). Leave ngrok running while ChatGPT uses the bridge.
 2. Copy the HTTPS forwarding URL.
 3. In the Custom GPT builder → **Actions** → **Add Action** → **Model Context Protocol**, paste the URL into **Server URL**.
-4. Set `FINANCE_ANGLE_BASE_URL` in the "Environment Variables" UI so the bridge resolves backend requests correctly.
+4. Set `FINANCE_ANGLE_BASE_URL` (and optional `MCP_LOG_LEVEL`) in the "Environment Variables" section so the bridge resolves backend requests correctly.
+
+### Quick curl checks
+Before tunnelling:
+```bash
+# Metadata (Custom GPTs sometimes call GET / before POSTing JSON-RPC)
+curl http://localhost:3333/
+
+# Health probe
+curl http://localhost:3333/health
+
+# JSON-RPC tool list
+curl -X POST http://localhost:3333/ \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+
+# Example tool call (register receipt)
+curl -X POST http://localhost:3333/ \
+  -H 'Content-Type: application/json' \
+  -d '{
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/call",
+        "params": {
+          "toolName": "registerReceipt",
+          "arguments": {
+            "externalId": "curl-receipt-001",
+            "status": "PENDING"
+          }
+        }
+      }'
+```
+
+After ngrok is running, repeat the same `curl` commands with the forwarding URL:
+```bash
+curl https://<your-ngrok-url>/
+curl https://<your-ngrok-url>/health
+curl -X POST https://<your-ngrok-url>/ -H 'Content-Type: application/json' -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+If these calls succeed, the Custom GPT integration will work as well.
 
 ChatGPT now calls the HTTP endpoint directly without needing Dev Mode. Logs still stream to stderr; set `MCP_LOG_LEVEL=DEBUG` when diagnosing issues.
 
