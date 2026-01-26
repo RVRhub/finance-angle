@@ -82,17 +82,23 @@ class McpServer(
             "initialize" -> successEnvelope(
                 request.id,
                 objectMapper.createObjectNode().apply {
-                    put("protocolVersion", "1.0")
-                    val serverNode = objectMapper.createObjectNode().apply {
+                    put("protocolVersion", "2024-11-05")
+                    val serverInfoNode = objectMapper.createObjectNode().apply {
                         put("name", "finance-angle-mcp")
                         put("version", "0.1.0")
                     }
-                    set<ObjectNode>("server", serverNode)
+                    set<ObjectNode>("serverInfo", serverInfoNode)
                     val capabilitiesNode = objectMapper.createObjectNode().apply {
                         val toolsCapability = objectMapper.createObjectNode().apply {
                             put("listChanged", false)
+                            val callNode = objectMapper.createObjectNode().apply {
+                                put("parallel", true)
+                            }
+                            set<ObjectNode>("call", callNode)
                         }
                         set<ObjectNode>("tools", toolsCapability)
+                        val loggingCapability = objectMapper.createObjectNode()
+                        set<ObjectNode>("logging", loggingCapability)
                     }
                     set<ObjectNode>("capabilities", capabilitiesNode)
                 }
@@ -103,11 +109,33 @@ class McpServer(
             "tools/list" -> successEnvelope(
                 request.id,
                 objectMapper.createObjectNode().apply {
-                    putNull("cursor")
+                    putNull("nextCursor")
                     val toolsNode: JsonNode = objectMapper.valueToTree(tools.values.map { it.toListEntry() })
                     set<JsonNode>("tools", toolsNode)
                 }
             )
+
+            "resources/list" -> successEnvelope(
+                request.id,
+                objectMapper.createObjectNode().apply {
+                    putNull("nextCursor")
+                    set<JsonNode>("resources", objectMapper.createArrayNode())
+                }
+            )
+
+            "prompts/list" -> successEnvelope(
+                request.id,
+                objectMapper.createObjectNode().apply {
+                    putNull("nextCursor")
+                    set<JsonNode>("prompts", objectMapper.createArrayNode())
+                }
+            )
+
+            "logging/setLevel" -> {
+                val levelValue = request.params?.get("level")?.asText()
+                logInfo("logging/setLevel requested: ${levelValue ?: "unspecified"}")
+                successEnvelope(request.id, objectMapper.createObjectNode())
+            }
 
             "tools/call" -> handleToolCall(request)
 
@@ -118,18 +146,22 @@ class McpServer(
     private fun handleToolCall(request: JsonRpcRequest): ObjectNode {
         val paramsNode = request.params
         if (paramsNode == null || !paramsNode.isObject) {
+            logWarn("tools/call received invalid params: ${paramsNode?.toString()?.take(200) ?: "null"}")
             return errorEnvelope(request.id, message = "Invalid params for tools/call")
         }
         val toolName = paramsNode.get("toolName")?.asText()
+            ?: paramsNode.get("name")?.asText()
         if (toolName.isNullOrBlank()) {
-            return errorEnvelope(request.id, message = "toolName is required for tools/call")
+            logWarn("tools/call missing toolName/name. Payload: ${paramsNode.toString().take(200)}")
+            return errorEnvelope(request.id, message = "toolName (or name) is required for tools/call")
         }
+        val argsNode = paramsNode.get("arguments")
+        logInfo("tools/call requested: name=$toolName args=${argsNode?.toString()?.take(200) ?: "null"}")
         val tool = tools[toolName]
         if (tool == null) {
             logWarn("Unknown tool requested: $toolName")
             return errorEnvelope(request.id, message = "Unknown tool $toolName")
         }
-        val argsNode = paramsNode.get("arguments")
         try {
             logDebug("Executing tool $toolName")
             val result = tool.handler.invoke(argsNode)
@@ -560,12 +592,21 @@ class McpServer(
 
     private fun sendJsonRequest(request: HttpRequest): HttpJsonResponse {
         logDebug("HTTP ${request.method()} ${request.uri()}")
-        val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+        val response = try {
+            httpClient.send(request, HttpResponse.BodyHandlers.ofString())
+        } catch (e: Exception) {
+            logError("HTTP request failed for ${request.method()} ${request.uri()}", e)
+            throw e
+        }
         val bodyText = response.body()
         val bodyNode = try {
-            if (bodyText.isNullOrBlank()) null else objectMapper.readTree(bodyText)
+            if (bodyText.isBlank()) null else objectMapper.readTree(bodyText)
         } catch (e: Exception) {
+            logWarn("Failed to parse JSON body for ${request.method()} ${request.uri()}: ${e.message}")
             null
+        }
+        if (response.statusCode() >= 400) {
+            logWarn("HTTP ${response.statusCode()} for ${request.method()} ${request.uri()} body=${bodyText.take(500)}")
         }
         logDebug("HTTP response ${response.statusCode()} for ${request.uri()}")
         return HttpJsonResponse(response.statusCode(), bodyNode, bodyText)

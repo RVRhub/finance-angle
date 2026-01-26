@@ -29,7 +29,7 @@ class McpServerTest {
         val node = mapper.readTree(envelope)
         assertEquals("2.0", node["jsonrpc"].asText())
         assertEquals(1, node["id"].asInt())
-        val serverNode = node["result"]["server"]
+        val serverNode = node["result"]["serverInfo"]
         assertEquals("finance-angle-mcp", serverNode["name"].asText())
     }
 
