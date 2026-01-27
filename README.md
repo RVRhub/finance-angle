@@ -69,3 +69,11 @@ The repository now contains two modules: `backend/` (Spring Boot API) and `mcp-s
 - Replace the `NoOpAiClient` with a real OpenAI implementation.
 - Wire ChatGPT voice/photo workflows to call the existing ingestion and transaction endpoints.
 - Extend the summary reporting with budgets, alerts, and prediction visualisations.
+
+## Dashboard app (SQLite + charts)
+
+- Run the lightweight dashboard module locally with SQLite file storage:
+  ```bash
+  DB_FILE=/path/to/iCloud/finance.db ./gradlew :dashboard-app:bootRun
+  ```
+- Open the UI at `http://localhost:8090` for charts or `http://localhost:8090/swagger-ui.html` for CSV upload and manual entries.

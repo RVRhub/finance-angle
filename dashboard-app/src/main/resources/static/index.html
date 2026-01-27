@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Finance Angle Dashboard</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 24px; color: #0f172a; }
+        h1 { margin-bottom: 8px; }
+        .section { margin-bottom: 24px; }
+        img { max-width: 100%; border: 1px solid #e2e8f0; padding: 8px; background: #ffffff; }
+        code { background: #f1f5f9; padding: 2px 4px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+<h1>Finance Angle Dashboard</h1>
+<p>Upload Finanzguru CSVs or add manual entries via Swagger UI, then refresh charts below.</p>
+
+<div class="section">
+    <strong>Swagger:</strong> <a href="/swagger-ui.html">/swagger-ui.html</a>
+    <div>Run the app with your DB file: <code>DB_FILE=/path/to/iCloud/finance.db ./gradlew :dashboard-app:bootRun</code></div>
+</div>
+
+<div class="section">
+    <h3>Spending by Category</h3>
+    <img src="/api/charts/spending.svg" alt="Spending chart" />
+</div>
+
+<div class="section">
+    <h3>Balance Over Time</h3>
+    <img src="/api/charts/balance.svg" alt="Balance chart" />
+</div>
+
+</body>
+</html>
