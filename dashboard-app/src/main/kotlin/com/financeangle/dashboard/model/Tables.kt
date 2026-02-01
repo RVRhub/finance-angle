@@ -8,6 +8,8 @@ object Accounts : IntIdTable(name = "accounts") {
     val name = varchar("name", 128)
     val provider = varchar("provider", 128).nullable()
     val currency = varchar("currency", 3).default("EUR")
+    val externalId = varchar("external_id", 128).nullable()
+    val accountNumber = varchar("account_number", 64).nullable()
 }
 
 object Transactions : IntIdTable(name = "transactions") {
@@ -24,7 +26,15 @@ object AccountBalanceSnapshot : IntIdTable(name = "snapshots") {
     val type = enumerationByName("type", 32, AccountBalanceType::class).default(AccountBalanceType.DEBIT)
     val kind = enumerationByName("kind", 32, AccountKind::class).default(AccountKind.CHECKING)
     val date = date("date")
-    val balance = decimal("balance", 12, 2)
+    val balance = decimal("balance", 14, 2)
+    val balanceCurrency = varchar("balance_currency", 3).default("EUR")
+    val originalAmount = decimal("original_amount", 14, 2).nullable()
+    val originalCurrency = varchar("original_currency", 3).nullable()
+    val fxRate = decimal("fx_rate", 18, 8).nullable()
+    val fxFromCurrency = varchar("fx_from_currency", 3).nullable()
+    val fxToCurrency = varchar("fx_to_currency", 3).nullable()
+    val fxRateDate = date("fx_rate_date").nullable()
+    val fxSource = varchar("fx_source", 128).nullable()
     val note = varchar("note", 256).nullable()
 }
 
@@ -41,9 +51,24 @@ data class TransactionRecord(
 data class SnapshotRecord(
     val id: Int,
     val date: java.time.LocalDate,
-    val balance: BigDecimal,
+    val balance: MoneyAmount,
+    val original: MoneyAmount,
+    val fxToEur: FxRate?,
     val type: AccountBalanceType,
     val kind: AccountKind,
     val account: String?,
     val note: String?
+)
+
+/**
+ * Represents an account persisted in the database. The `accountId` is the stable identifier
+ * returned to API consumers: if an external id was provided we echo that, otherwise we fall back
+ * to the internal numeric primary key as a string.
+ */
+data class AccountRecord(
+    val accountId: String,
+    val name: String,
+    val accountNumber: String?,
+    val provider: String?,
+    val currency: String
 )

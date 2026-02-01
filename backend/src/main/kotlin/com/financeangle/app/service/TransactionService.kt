@@ -5,6 +5,7 @@ import com.financeangle.app.repository.TransactionRepository
 import com.financeangle.app.service.model.SummaryPeriod
 import com.financeangle.app.service.model.TransactionCommand
 import com.financeangle.app.service.model.TransactionSummary
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.math.BigDecimal
@@ -20,8 +21,16 @@ class TransactionService(
     private val transactionRepository: TransactionRepository
 ) {
 
+    private val logger = LoggerFactory.getLogger(TransactionService::class.java)
+
     @Transactional
     fun recordTransaction(command: TransactionCommand): TransactionEntity {
+        logger.info(
+            "Recording transaction amount={} category={} source={}",
+            command.amount,
+            command.category,
+            command.sourceType
+        )
         val entity = TransactionEntity(
             amount = command.amount,
             category = command.category,
@@ -30,12 +39,16 @@ class TransactionService(
             sourceType = command.sourceType,
             receiptReference = command.receiptReference
         )
-        return transactionRepository.save(entity)
+        val saved = transactionRepository.save(entity)
+        logger.debug("Recorded transaction id={} receiptReference={}", saved.id, saved.receiptReference)
+        return saved
     }
 
     @Transactional(readOnly = true)
     fun generateSummary(period: SummaryPeriod, reference: Instant = Instant.now()): TransactionSummary {
+        logger.info("Generating {} transaction summary", period)
         val (start, end) = resolveRange(period, reference)
+        logger.debug("Summary window start={} end={}", start, end)
         val transactions = transactionRepository.findAllByOccurredAtBetween(start, end)
         val totalAmount = transactions.fold(BigDecimal.ZERO) { acc, tx -> acc + tx.amount }
         val totalsByCategory = transactions

@@ -20,24 +20,52 @@ data class TransactionRequest(
     val accountState: BigDecimal? = null
 )
 
+/**
+ * Register or upsert an account. Supply `accountId` when you want a stable external identifier; if omitted,
+ * the service will generate and return its internal id as a string. `accountNumber` is optional and never
+ * exposed as a primary key.
+ */
+data class AccountRequest(
+    @field:NotBlank
+    @field:Size(max = 128)
+    val name: String,
+    @field:Size(max = 128)
+    val accountId: String? = null,
+    @field:Size(max = 64)
+    val accountNumber: String? = null,
+    @field:Size(max = 128)
+    val provider: String? = null,
+    @field:Size(max = 3)
+    val currency: String = "EUR"
+)
+
 data class AccountBalanceSnapshotRequest(
     @field:NotNull
     val date: LocalDate,
-    @field:NotNull
-    val balance: BigDecimal,
     @field:NotNull
     val type: AccountBalanceType,
     val kind: AccountKind,
     @field:NotNull
     val account: String? = null,
+    @field:NotNull
+    val original: MoneyAmount,
+    val fxToEur: FxRate? = null,
     val note: String? = null
 )
 
-enum class AccountBalanceType {
-    DEBIT,    // bank / cash
-    CREDIT,  // credit card owed
-    LOAN,     // loan remaining
-    INVESTMENT   // market value of holdings (broker/crypto)
+data class FxRate(
+    val fromCurrency: String,
+    val toCurrency: String? = "EUR",
+    val rate: BigDecimal,
+    val rateDate: LocalDate?,
+    val source: String? = null
+)
+
+enum class AccountBalanceType(val sign: BigDecimal) {
+    DEBIT(BigDecimal.ONE),
+    INVESTMENT(BigDecimal.ONE),
+    CREDIT(BigDecimal.ONE.negate()),
+    LOAN(BigDecimal.ONE.negate())
 }
 
 enum class AccountKind(

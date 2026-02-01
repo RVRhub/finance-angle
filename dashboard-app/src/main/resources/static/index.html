@@ -10,6 +10,16 @@
         img { max-width: 100%; border: 1px solid #e2e8f0; padding: 8px; background: #ffffff; }
         .note { color: #475569; font-size: 14px; margin-top: 8px; }
         code { background: #f1f5f9; padding: 2px 4px; border-radius: 4px; }
+        table { border-collapse: collapse; width: 100%; margin-top: 12px; }
+        th, td { border: 1px solid #e2e8f0; padding: 10px 12px; text-align: left; }
+        th { background: #f8fafc; color: #0f172a; }
+        tr:nth-child(even) { background: #f8fafc; }
+        .btn { display: inline-block; padding: 8px 12px; background: #0f172a; color: #ffffff; border-radius: 6px; text-decoration: none; font-size: 14px; }
+        .btn:hover { background: #1e293b; }
+        .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 20px; margin-top: 12px; }
+        .chart-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; }
+        .chart-card h3 { margin-top: 0; margin-bottom: 10px; font-size: 18px; }
+        .chart-card img { width: 100%; height: auto; }
     </style>
 </head>
 <body>
@@ -22,15 +32,67 @@
 </div>
 
 <div class="section">
-    <h3>Spending by Category</h3>
-    <img src="/api/charts/spending.svg" alt="Spending chart" />
-    <div class="note">Resize or regroup via query params, e.g. <code>/api/charts/spending.svg?width=1400&amp;height=600&amp;stacked=false</code></div>
+    <h3>Chart endpoints</h3>
+    <p>Use these endpoints to embed or fine-tune the visuals.</p>
+    <table>
+        <thead>
+        <tr>
+            <th>Chart</th>
+            <th>Endpoint</th>
+            <th>Example options</th>
+            <th>Notes</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr>
+            <td>Spending by category</td>
+            <td><code>/api/charts/spending.svg</code></td>
+            <td>
+                <a class="btn" href="/api/charts/spending.svg?width=1400&amp;height=600&amp;stacked=false" target="_blank" rel="noopener noreferrer">Open example</a>
+                <div class="note">Example: <code>?width=1400&amp;height=600&amp;stacked=false</code></div>
+            </td>
+            <td>Switch between stacked and grouped bars or resize for embeds.</td>
+        </tr>
+        <tr>
+            <td>Account Position</td>
+            <td><code>/api/charts/balance.svg</code></td>
+            <td>
+                <a class="btn" href="/api/charts/balance.svg?width=1400&amp;height=600&amp;dpi=200" target="_blank" rel="noopener noreferrer">Open example</a>
+                <div class="note">Example: <code>?width=1400&amp;height=600&amp;dpi=200</code></div>
+            </td>
+            <td>Portfolio balance across all accounts; adjust resolution for exports.</td>
+        </tr>
+        <tr>
+            <td>Balance by account</td>
+            <td><code>/api/charts/balance-by-account.svg</code></td>
+            <td>
+                <a class="btn" href="/api/charts/balance-by-account.svg?width=1400&amp;height=600&amp;dpi=200" target="_blank" rel="noopener noreferrer">Open example</a>
+                <div class="note">Example: <code>?width=1400&amp;height=600&amp;dpi=200</code></div>
+            </td>
+            <td>Track balances per account; resize to fit dashboards.</td>
+        </tr>
+        </tbody>
+    </table>
 </div>
 
-<div class="section">
-    <h3>Balance Over Time</h3>
-    <img src="/api/charts/balance.svg" alt="Balance chart" />
-    <div class="note">Adjust output size with <code>?width=1400&amp;height=600</code> and optional <code>&amp;dpi=200</code>.</div>
+<div class="charts">
+    <div class="chart-card">
+        <h3>Account Position</h3>
+        <img src="/api/charts/balance.svg" alt="Account Position chart" />
+        <div class="note">Adjust output size with <code>?width=1400&amp;height=600</code> and optional <code>&amp;dpi=200</code>.</div>
+    </div>
+
+    <div class="chart-card">
+        <h3>Spending by Category</h3>
+        <img src="/api/charts/spending.svg" alt="Spending chart" />
+        <div class="note">Resize or regroup via query params, e.g. <code>/api/charts/spending.svg?width=1400&amp;height=600&amp;stacked=false</code></div>
+    </div>
+
+    <div class="chart-card">
+        <h3>Balance by Account</h3>
+        <img src="/api/charts/balance-by-account.svg" alt="Balance by Account chart" />
+        <div class="note">Adjust output size with <code>?width=1400&amp;height=600</code> and optional <code>&amp;dpi=200</code>.</div>
+    </div>
 </div>
 
 </body>

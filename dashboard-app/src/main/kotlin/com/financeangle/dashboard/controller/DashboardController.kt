@@ -1,6 +1,8 @@
 package com.financeangle.dashboard.controller
 
 import com.financeangle.dashboard.model.AccountBalanceSnapshotRequest
+import com.financeangle.dashboard.model.AccountRecord
+import com.financeangle.dashboard.model.AccountRequest
 import com.financeangle.dashboard.model.ImportResult
 import com.financeangle.dashboard.model.SnapshotRecord
 import com.financeangle.dashboard.model.SummaryPoint
@@ -12,6 +14,7 @@ import com.financeangle.dashboard.service.TransactionService
 import jakarta.validation.Valid
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -28,6 +31,12 @@ class DashboardController(
     private val chartService: ChartService
 ) {
 
+    @PostMapping("/accounts")
+    fun addAccount(@Valid @RequestBody request: AccountRequest): AccountRecord = transactionService.addAccount(request)
+
+    @GetMapping("/accounts")
+    fun listAccounts(): List<AccountRecord> = transactionService.listAccounts()
+
     @PostMapping("/transactions")
     fun addTransaction(@Valid @RequestBody request: TransactionRequest): TransactionRecord =
         transactionService.addTransaction(request)
@@ -37,6 +46,9 @@ class DashboardController(
 
     @PostMapping("/snapshots")
     fun addSnapshot(@Valid @RequestBody request: AccountBalanceSnapshotRequest): SnapshotRecord = transactionService.addSnapshot(request)
+
+    @DeleteMapping("/snapshots")
+    fun deleteSnapshot(@RequestParam id: String): SnapshotRecord = transactionService.deleteSnapshot(id)
 
     @GetMapping("/snapshots")
     fun listSnapshots(): List<SnapshotRecord> = transactionService.listSnapshots()
@@ -93,6 +105,16 @@ class DashboardController(
         ResponseEntity.ok()
             .contentType(svgMediaType)
             .body(chartService.balanceChartSvg(chartOptions(width, height, dpi)))
+
+    @GetMapping("/charts/balance-by-account.svg", produces = ["image/svg+xml"])
+    fun balanceByAccountTypeChart(
+        @RequestParam(required = false) width: Int?,
+        @RequestParam(required = false) height: Int?,
+        @RequestParam(required = false) dpi: Int?
+    ): ResponseEntity<String> =
+        ResponseEntity.ok()
+            .contentType(svgMediaType)
+            .body(chartService.balanceByAccountTypeChartSvg(chartOptions(width, height, dpi)))
 
     private fun chartOptions(width: Int?, height: Int?, dpi: Int?) =
         ChartRenderOptions.from(width, height, dpi)
