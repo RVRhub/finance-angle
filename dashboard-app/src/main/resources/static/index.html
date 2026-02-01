@@ -48,8 +48,8 @@
             <td>Spending by category</td>
             <td><code>/api/charts/spending.svg</code></td>
             <td>
-                <a class="btn" href="/api/charts/spending.svg?width=1400&amp;height=600&amp;stacked=false" target="_blank" rel="noopener noreferrer">Open example</a>
-                <div class="note">Example: <code>?width=1400&amp;height=600&amp;stacked=false</code></div>
+                <a class="btn" href="/api/charts/spending.svg?width=1400&amp;height=600&amp;stacked=false&amp;months=12" target="_blank" rel="noopener noreferrer">Open 12-month example</a>
+                <div class="note">Examples: <code>?width=1400&amp;height=600&amp;stacked=false</code> or <code>?months=3</code> / <code>?months=24</code></div>
             </td>
             <td>Switch between stacked and grouped bars or resize for embeds.</td>
         </tr>
@@ -85,7 +85,7 @@
     <div class="chart-card">
         <h3>Spending by Category</h3>
         <img src="/api/charts/spending.svg" alt="Spending chart" />
-        <div class="note">Resize or regroup via query params, e.g. <code>/api/charts/spending.svg?width=1400&amp;height=600&amp;stacked=false</code></div>
+        <div class="note">Resize or regroup via query params, e.g. <code>/api/charts/spending.svg?width=1400&amp;height=600&amp;stacked=false&amp;months=12</code></div>
     </div>
 
     <div class="chart-card">
@@ -93,6 +93,10 @@
         <img src="/api/charts/balance-by-account.svg" alt="Balance by Account chart" />
         <div class="note">Adjust output size with <code>?width=1400&amp;height=600</code> and optional <code>&amp;dpi=200</code>.</div>
     </div>
+    <!-- Add Save account charts -->
+    <!-- Add Month Account Posstion Chart ,
+         Green segment → higher than previous month
+        Red segment → lower than previous month-->
 </div>
 
 </body>

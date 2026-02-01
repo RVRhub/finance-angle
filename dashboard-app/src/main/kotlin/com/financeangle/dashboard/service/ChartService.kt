@@ -24,17 +24,20 @@ class ChartService(
 
     private val logger = LoggerFactory.getLogger(ChartService::class.java)
 
-    fun spendingChartSvg(options: ChartRenderOptions = ChartRenderOptions(), stacked: Boolean = true): String {
-        val summary = transactionService.monthlyCategorySummary()
+    fun spendingChartSvg(
+        options: ChartRenderOptions = ChartRenderOptions(),
+        stacked: Boolean = true,
+        months: Int? = null
+    ): String {
+        val summary = transactionService.monthlyCategorySummary(months)
         if (summary.isEmpty()) return emptySvg("No spending data yet", options)
         val data = mapOf(
             "month" to summary.map { it.month.toString() },
             "category" to summary.map { it.category ?: "Uncategorised" },
-            "total" to summary.map { it.total.toDouble() }
+            "total" to summary.map {
+                it.total.toDouble()
+            }
         )
-        data.forEach { (key, value) ->
-            logger.info("$key: $value")
-        }
         val position = if (stacked) positionStack() else positionDodge()
         val plot = letsPlot(data) { x = "month"; y = "total"; fill = "category" } +
             geomBar(stat = Stat.identity, position = position) +

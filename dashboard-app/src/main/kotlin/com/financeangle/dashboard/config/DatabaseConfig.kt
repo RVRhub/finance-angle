@@ -1,7 +1,9 @@
 package com.financeangle.dashboard.config
 
-import com.financeangle.dashboard.model.Accounts
 import com.financeangle.dashboard.model.AccountBalanceSnapshot
+import com.financeangle.dashboard.model.AccountPositionSnapshotAccounts
+import com.financeangle.dashboard.model.AccountPositionSnapshots
+import com.financeangle.dashboard.model.Accounts
 import com.financeangle.dashboard.model.Transactions
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
@@ -40,7 +42,13 @@ class DatabaseConfig(
         val db = Database.connect(dataSource)
         TransactionManager.manager.defaultIsolationLevel = java.sql.Connection.TRANSACTION_SERIALIZABLE
         transaction(db) {
-            SchemaUtils.createMissingTablesAndColumns(Accounts, Transactions, AccountBalanceSnapshot)
+            SchemaUtils.createMissingTablesAndColumns(
+                Accounts,
+                Transactions,
+                AccountBalanceSnapshot,
+                AccountPositionSnapshots,
+                AccountPositionSnapshotAccounts
+            )
         }
         return db
     }

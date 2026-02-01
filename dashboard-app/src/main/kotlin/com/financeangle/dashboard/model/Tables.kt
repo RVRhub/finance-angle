@@ -3,13 +3,14 @@ package com.financeangle.dashboard.model
 import org.jetbrains.exposed.dao.id.IntIdTable
 import org.jetbrains.exposed.sql.javatime.date
 import java.math.BigDecimal
+import java.time.YearMonth
 
 object Accounts : IntIdTable(name = "accounts") {
     val name = varchar("name", 128)
+    val accountNumber = varchar("account_number", 64)
     val provider = varchar("provider", 128).nullable()
     val currency = varchar("currency", 3).default("EUR")
     val externalId = varchar("external_id", 128).nullable()
-    val accountNumber = varchar("account_number", 64).nullable()
 }
 
 object Transactions : IntIdTable(name = "transactions") {
@@ -36,6 +37,26 @@ object AccountBalanceSnapshot : IntIdTable(name = "snapshots") {
     val fxRateDate = date("fx_rate_date").nullable()
     val fxSource = varchar("fx_source", 128).nullable()
     val note = varchar("note", 256).nullable()
+}
+
+object AccountPositionSnapshots : IntIdTable(name = "account_position_snapshots") {
+    val snapshotMonth = date("snapshot_month")
+    val savingsBudget = decimal("savings_budget", 14, 2).default(BigDecimal.ZERO)
+    val savingsCurrency = varchar("savings_currency", 3).default("EUR")
+}
+
+object AccountPositionSnapshotAccounts : IntIdTable(name = "account_position_snapshot_accounts") {
+    val snapshotId = reference("snapshot_id", AccountPositionSnapshots)
+    val accountId = reference("account_id", Accounts).nullable()
+    val accountName = varchar("account_name", 128)
+    val debitAmount = decimal("debit_amount", 14, 2).nullable()
+    val debitCurrency = varchar("debit_currency", 3).nullable()
+    val creditAmount = decimal("credit_amount", 14, 2).nullable()
+    val creditCurrency = varchar("credit_currency", 3).nullable()
+    val loansAmount = decimal("loans_amount", 14, 2).nullable()
+    val loansCurrency = varchar("loans_currency", 3).nullable()
+    val sharedDebitAmount = decimal("shared_debit_amount", 14, 2).nullable()
+    val sharedDebitCurrency = varchar("shared_debit_currency", 3).nullable()
 }
 
 data class TransactionRecord(
@@ -71,4 +92,12 @@ data class AccountRecord(
     val accountNumber: String?,
     val provider: String?,
     val currency: String
+)
+
+data class AccountPositionSnapshotRecord(
+    val id: Int,
+    val month: YearMonth,
+    val accounts: List<AccountSnapshot>,
+    val savingsBudget: MoneyAmount,
+    val totals: SnapshotTotals
 )

@@ -16,7 +16,7 @@ data class TransactionRequest(
     val category: String? = null,
     @field:NotNull
     val amount: BigDecimal,
-    val account: String? = null,
+    val accountNumber: String? = null,
     val accountState: BigDecimal? = null
 )
 
@@ -29,10 +29,10 @@ data class AccountRequest(
     @field:NotBlank
     @field:Size(max = 128)
     val name: String,
+    @field:Size(max = 64)
+    val accountNumber: String,
     @field:Size(max = 128)
     val accountId: String? = null,
-    @field:Size(max = 64)
-    val accountNumber: String? = null,
     @field:Size(max = 128)
     val provider: String? = null,
     @field:Size(max = 3)
@@ -51,6 +51,19 @@ data class AccountBalanceSnapshotRequest(
     val original: MoneyAmount,
     val fxToEur: FxRate? = null,
     val note: String? = null
+)
+
+data class AccountSnapshotRequest(
+    @field:NotBlank
+    val accountId: String,
+    val debit: MoneyAmount? = null,
+    val credit: MoneyAmount? = null,
+    val loans: MoneyAmount? = null,
+    val sharedDebitWithWife: MoneyAmount? = null
+)
+
+data class MonthlyAccountPositionRequest(
+    val savingsBudget: MoneyAmount? = null
 )
 
 data class FxRate(
