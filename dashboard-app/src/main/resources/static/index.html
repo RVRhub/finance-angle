@@ -8,6 +8,7 @@
         h1 { margin-bottom: 8px; }
         .section { margin-bottom: 24px; }
         img { max-width: 100%; border: 1px solid #e2e8f0; padding: 8px; background: #ffffff; }
+        .note { color: #475569; font-size: 14px; margin-top: 8px; }
         code { background: #f1f5f9; padding: 2px 4px; border-radius: 4px; }
     </style>
 </head>
@@ -23,11 +24,13 @@
 <div class="section">
     <h3>Spending by Category</h3>
     <img src="/api/charts/spending.svg" alt="Spending chart" />
+    <div class="note">Resize or regroup via query params, e.g. <code>/api/charts/spending.svg?width=1400&amp;height=600&amp;stacked=false</code></div>
 </div>
 
 <div class="section">
     <h3>Balance Over Time</h3>
     <img src="/api/charts/balance.svg" alt="Balance chart" />
+    <div class="note">Adjust output size with <code>?width=1400&amp;height=600</code> and optional <code>&amp;dpi=200</code>.</div>
 </div>
 
 </body>

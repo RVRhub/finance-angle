@@ -1,10 +1,11 @@
 package com.financeangle.dashboard.service
 
+import com.financeangle.dashboard.model.AccountBalanceSnapshotRequest
 import com.financeangle.dashboard.model.Accounts
 import com.financeangle.dashboard.model.ImportResult
 import com.financeangle.dashboard.model.SnapshotRecord
-import com.financeangle.dashboard.model.SnapshotRequest
-import com.financeangle.dashboard.model.Snapshots
+import com.financeangle.dashboard.model.AccountBalanceSnapshot
+import com.financeangle.dashboard.model.AccountKind
 import com.financeangle.dashboard.model.SummaryPoint
 import com.financeangle.dashboard.model.TransactionRecord
 import com.financeangle.dashboard.model.TransactionRequest
@@ -13,7 +14,6 @@ import com.github.doyaaaaaken.kotlincsv.dsl.csvReader
 import org.springframework.stereotype.Service
 import org.jetbrains.kotlinx.dataframe.api.add
 import org.jetbrains.kotlinx.dataframe.api.groupBy
-import org.jetbrains.kotlinx.dataframe.api.into
 import org.jetbrains.kotlinx.dataframe.api.isEmpty
 import org.jetbrains.kotlinx.dataframe.api.rows
 import org.jetbrains.kotlinx.dataframe.api.sortBy
@@ -23,7 +23,6 @@ import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.insertAndGetId
 import org.jetbrains.exposed.sql.select
 import org.jetbrains.exposed.sql.selectAll
@@ -56,19 +55,21 @@ class TransactionService(
         Transactions.selectAll().orderBy(Transactions.date to SortOrder.ASC).map { asTransactionRecord(it) }
     }
 
-    fun addSnapshot(request: SnapshotRequest): SnapshotRecord = transaction(database) {
+    fun addSnapshot(request: AccountBalanceSnapshotRequest): SnapshotRecord = transaction(database) {
         val accountId = resolveAccount(request.account)
-        val id = Snapshots.insertAndGetId { row ->
-            row[Snapshots.accountId] = accountId
-            row[Snapshots.date] = request.date
-            row[Snapshots.balance] = request.balance
-            row[Snapshots.note] = request.note
+        val id = AccountBalanceSnapshot.insertAndGetId { row ->
+            row[AccountBalanceSnapshot.accountId] = accountId
+            row[AccountBalanceSnapshot.type] = request.type
+            row[AccountBalanceSnapshot.kind] = request.kind
+            row[AccountBalanceSnapshot.date] = request.date
+            row[AccountBalanceSnapshot.balance] = request.balance
+            row[AccountBalanceSnapshot.note] = request.note
         }
-        asSnapshotRecord(Snapshots.select { Snapshots.id eq id }.single())
+        asSnapshotRecord(AccountBalanceSnapshot.select { AccountBalanceSnapshot.id eq id }.single())
     }
 
     fun listSnapshots(): List<SnapshotRecord> = transaction(database) {
-        Snapshots.selectAll().orderBy(Snapshots.date to SortOrder.ASC).map { asSnapshotRecord(it) }
+        AccountBalanceSnapshot.selectAll().orderBy(AccountBalanceSnapshot.date to SortOrder.ASC).map { asSnapshotRecord(it) }
     }
 
     fun monthlyCategorySummary(): List<SummaryPoint> {
@@ -105,10 +106,11 @@ class TransactionService(
         decimalComma: Boolean = true,
         datePattern: String = "dd.MM.yyyy",
         dateColumn: String = "Buchungstag",
-        descriptionColumn: String = "Verwendungszweck",
+        accountColumn: String = "Konto",
+        accountStateColumn: String = "Kontostand",
         amountColumn: String = "Betrag",
-        categoryColumn: String = "Kategorie",
-        accountColumn: String = "Konto"
+        descriptionColumn: String = "Verwendungszweck",
+        categoryColumn: String = "Kategorie"
     ): ImportResult {
         val errors = mutableListOf<String>()
         var imported = 0
@@ -121,6 +123,7 @@ class TransactionService(
             try {
                 val date = parseDate(row[dateColumn], datePattern)
                 val amount = parseAmount(row[amountColumn], decimalComma)
+                val accountState = parseAmount(row[accountStateColumn], decimalComma)
                 val description = row[descriptionColumn] ?: ""
                 val category = row[categoryColumn]
                 val account = row[accountColumn]
@@ -130,7 +133,8 @@ class TransactionService(
                         description = description,
                         category = category,
                         amount = amount,
-                        account = account
+                        account = account,
+                        accountState = accountState
                     )
                 )
                 imported += 1
@@ -189,12 +193,24 @@ class TransactionService(
     )
 
     private fun asSnapshotRecord(row: ResultRow) = SnapshotRecord(
-        id = row[Snapshots.id].value,
-        date = row[Snapshots.date],
-        balance = row[Snapshots.balance],
-        account = row[Snapshots.accountId]?.let { id ->
+        id = row[AccountBalanceSnapshot.id].value,
+        date = row[AccountBalanceSnapshot.date],
+        balance = row[AccountBalanceSnapshot.balance],
+        type = row[AccountBalanceSnapshot.type],
+        kind = row[AccountBalanceSnapshot.kind],
+        account = row[AccountBalanceSnapshot.accountId]?.let { id ->
             Accounts.select { Accounts.id eq id }.firstOrNull()?.get(Accounts.name)
         },
-        note = row[Snapshots.note]
+        note = row[AccountBalanceSnapshot.note]
     )
+
+    fun AccountKind.description(): String = when (this) {
+        AccountKind.CHECKING -> "Primary bank account used for daily income and expenses."
+        AccountKind.SAVINGS -> "Bank account used to store money for future use with low risk."
+        AccountKind.CASH -> "Physical cash or cash equivalents you have immediate access to."
+        AccountKind.CREDIT_CARD -> "Revolving credit account where the balance represents money owed."
+        AccountKind.LOAN -> "Borrowed money that must be repaid over time with interest."
+        AccountKind.BROKER -> "Investment account holding stocks, ETFs, or other securities."
+        AccountKind.CRYPTO_WALLET -> "Wallet holding cryptocurrencies valued at current market prices."
+    }
 }

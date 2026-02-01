@@ -19,8 +19,10 @@ object Transactions : IntIdTable(name = "transactions") {
     val origin = varchar("origin", 32)
 }
 
-object Snapshots : IntIdTable(name = "snapshots") {
+object AccountBalanceSnapshot : IntIdTable(name = "snapshots") {
     val accountId = reference("account_id", Accounts).nullable()
+    val type = enumerationByName("type", 32, AccountBalanceType::class).default(AccountBalanceType.DEBIT)
+    val kind = enumerationByName("kind", 32, AccountKind::class).default(AccountKind.CHECKING)
     val date = date("date")
     val balance = decimal("balance", 12, 2)
     val note = varchar("note", 256).nullable()
@@ -40,6 +42,8 @@ data class SnapshotRecord(
     val id: Int,
     val date: java.time.LocalDate,
     val balance: BigDecimal,
+    val type: AccountBalanceType,
+    val kind: AccountKind,
     val account: String?,
     val note: String?
 )

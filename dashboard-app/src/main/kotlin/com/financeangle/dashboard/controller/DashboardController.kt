@@ -1,11 +1,12 @@
 package com.financeangle.dashboard.controller
 
+import com.financeangle.dashboard.model.AccountBalanceSnapshotRequest
 import com.financeangle.dashboard.model.ImportResult
 import com.financeangle.dashboard.model.SnapshotRecord
-import com.financeangle.dashboard.model.SnapshotRequest
 import com.financeangle.dashboard.model.SummaryPoint
 import com.financeangle.dashboard.model.TransactionRecord
 import com.financeangle.dashboard.model.TransactionRequest
+import com.financeangle.dashboard.service.ChartRenderOptions
 import com.financeangle.dashboard.service.ChartService
 import com.financeangle.dashboard.service.TransactionService
 import jakarta.validation.Valid
@@ -35,7 +36,7 @@ class DashboardController(
     fun listTransactions(): List<TransactionRecord> = transactionService.listTransactions()
 
     @PostMapping("/snapshots")
-    fun addSnapshot(@Valid @RequestBody request: SnapshotRequest): SnapshotRecord = transactionService.addSnapshot(request)
+    fun addSnapshot(@Valid @RequestBody request: AccountBalanceSnapshotRequest): SnapshotRecord = transactionService.addSnapshot(request)
 
     @GetMapping("/snapshots")
     fun listSnapshots(): List<SnapshotRecord> = transactionService.listSnapshots()
@@ -50,10 +51,11 @@ class DashboardController(
         @RequestParam(defaultValue = "true") decimalComma: Boolean,
         @RequestParam(defaultValue = "dd.MM.yyyy") datePattern: String,
         @RequestParam(defaultValue = "Buchungstag") dateColumn: String,
-        @RequestParam(defaultValue = "Verwendungszweck") descriptionColumn: String,
+        @RequestParam(defaultValue = "Konto") accountColumn: String,
         @RequestParam(defaultValue = "Betrag") amountColumn: String,
-        @RequestParam(defaultValue = "Kategorie") categoryColumn: String,
-        @RequestParam(defaultValue = "Konto") accountColumn: String
+        @RequestParam(defaultValue = "Kontostand") accountStateColumn: String,
+        @RequestParam(defaultValue = "Verwendungszweck") descriptionColumn: String,
+        @RequestParam(defaultValue = "Kategorie") categoryColumn: String
     ): ImportResult {
         return transactionService.importFinanzguru(
             bytes = file.bytes,
@@ -61,6 +63,7 @@ class DashboardController(
             decimalComma = decimalComma,
             datePattern = datePattern,
             dateColumn = dateColumn,
+            accountStateColumn = accountStateColumn,
             descriptionColumn = descriptionColumn,
             amountColumn = amountColumn,
             categoryColumn = categoryColumn,
@@ -71,10 +74,26 @@ class DashboardController(
     private val svgMediaType = MediaType.parseMediaType("image/svg+xml")
 
     @GetMapping("/charts/spending.svg", produces = ["image/svg+xml"])
-    fun spendingChart(): ResponseEntity<String> =
-        ResponseEntity.ok().contentType(svgMediaType).body(chartService.spendingChartSvg())
+    fun spendingChart(
+        @RequestParam(required = false) width: Int?,
+        @RequestParam(required = false) height: Int?,
+        @RequestParam(required = false) dpi: Int?,
+        @RequestParam(defaultValue = "true") stacked: Boolean
+    ): ResponseEntity<String> =
+        ResponseEntity.ok()
+            .contentType(svgMediaType)
+            .body(chartService.spendingChartSvg(chartOptions(width, height, dpi), stacked))
 
     @GetMapping("/charts/balance.svg", produces = ["image/svg+xml"])
-    fun balanceChart(): ResponseEntity<String> =
-        ResponseEntity.ok().contentType(svgMediaType).body(chartService.balanceChartSvg())
+    fun balanceChart(
+        @RequestParam(required = false) width: Int?,
+        @RequestParam(required = false) height: Int?,
+        @RequestParam(required = false) dpi: Int?
+    ): ResponseEntity<String> =
+        ResponseEntity.ok()
+            .contentType(svgMediaType)
+            .body(chartService.balanceChartSvg(chartOptions(width, height, dpi)))
+
+    private fun chartOptions(width: Int?, height: Int?, dpi: Int?) =
+        ChartRenderOptions.from(width, height, dpi)
 }
