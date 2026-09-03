@@ -20,6 +20,12 @@
         .chart-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; }
         .chart-card h3 { margin-top: 0; margin-bottom: 10px; font-size: 18px; }
         .chart-card img { width: 100%; height: auto; }
+        .metric-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 16px 0; }
+        .metric { border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; background: #fff; }
+        .metric-label { color: #64748b; font-size: 13px; }
+        .metric-value { font-size: 24px; font-weight: 700; margin-top: 6px; }
+        .positive { color: #15803d; }
+        .negative { color: #b91c1c; }
     </style>
 </head>
 <body>
@@ -75,7 +81,33 @@
     </table>
 </div>
 
+<div class="section">
+    <h2>Monthly Financial Position</h2>
+    <p>Assets and savings improve your position; credit and loans reduce it.</p>
+    <div id="latest-position" class="metric-grid"></div>
+    <table>
+        <thead>
+        <tr>
+            <th>Month</th>
+            <th>Assets</th>
+            <th>Debts</th>
+            <th>Savings</th>
+            <th>Net position</th>
+            <th>Monthly change</th>
+        </tr>
+        </thead>
+        <tbody id="position-rows">
+        <tr><td colspan="6">Loading monthly positions…</td></tr>
+        </tbody>
+    </table>
+</div>
+
 <div class="charts">
+    <div class="chart-card">
+        <h3>Monthly Net Position</h3>
+        <img src="/api/charts/monthly-position.svg" alt="Monthly net position chart" />
+        <div class="note">Shows whether assets and savings are growing faster than debts.</div>
+    </div>
     <div class="chart-card">
         <h3>Account Position</h3>
         <img src="/api/charts/balance.svg" alt="Account Position chart" />
@@ -98,6 +130,58 @@
          Green segment → higher than previous month
         Red segment → lower than previous month-->
 </div>
+
+<script>
+    const eur = new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR' });
+    const value = money => eur.format(Number(money?.amount ?? 0));
+    const delta = (money, lowerIsBetter = false) => {
+        if (!money) return '—';
+        const amount = Number(money.amount);
+        const sign = amount > 0 ? '+' : '';
+        const improved = lowerIsBetter ? amount <= 0 : amount >= 0;
+        return `<span class="${improved ? 'positive' : 'negative'}">${sign}${eur.format(amount)}</span>`;
+    };
+    const metric = (label, money, change, lowerIsBetter = false) => `
+        <div class="metric">
+            <div class="metric-label">${label}</div>
+            <div class="metric-value">${value(money)}</div>
+            <div class="note">vs previous month: ${delta(change, lowerIsBetter)}</div>
+        </div>`;
+
+    fetch('/api/account-positions/comparison')
+        .then(response => {
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return response.json();
+        })
+        .then(rows => {
+            const body = document.getElementById('position-rows');
+            const latest = document.getElementById('latest-position');
+            if (!rows.length) {
+                body.innerHTML = '<tr><td colspan="6">No monthly positions yet. Create one in Swagger.</td></tr>';
+                return;
+            }
+            const newest = rows[rows.length - 1];
+            latest.innerHTML = [
+                metric('Assets', newest.assets, newest.change.assets),
+                metric('Debts', newest.debts, newest.change.debts, true),
+                metric('Savings', newest.savings, newest.change.savings),
+                metric('Net position', newest.netPosition, newest.change.netPosition)
+            ].join('');
+            body.innerHTML = [...rows].reverse().map(row => `
+                <tr>
+                    <td>${row.month}</td>
+                    <td>${value(row.assets)}</td>
+                    <td>${value(row.debts)}</td>
+                    <td>${value(row.savings)}</td>
+                    <td>${value(row.netPosition)}</td>
+                    <td>${delta(row.change.netPosition)}</td>
+                </tr>`).join('');
+        })
+        .catch(error => {
+            document.getElementById('position-rows').innerHTML =
+                `<tr><td colspan="6">Could not load monthly positions: ${error.message}</td></tr>`;
+        });
+</script>
 
 </body>
 </html>

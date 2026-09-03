@@ -5,6 +5,7 @@ import com.financeangle.dashboard.model.AccountRecord
 import com.financeangle.dashboard.model.AccountRequest
 import com.financeangle.dashboard.model.ImportResult
 import com.financeangle.dashboard.model.MonthlyAccountPositionRequest
+import com.financeangle.dashboard.model.MonthlyPositionComparison
 import com.financeangle.dashboard.model.SnapshotRecord
 import com.financeangle.dashboard.model.SummaryPoint
 import com.financeangle.dashboard.model.TransactionRecord
@@ -87,6 +88,10 @@ class DashboardController(
         .listMonthlyAccountPositions()
         .map { it.toResponse() }
 
+    @GetMapping("/account-positions/comparison")
+    fun compareMonthlyAccountPositions(): List<MonthlyPositionComparison> =
+        transactionService.compareMonthlyAccountPositions()
+
     @GetMapping("/summary/spending")
     fun summary(): List<SummaryPoint> = transactionService.monthlyCategorySummary()
 
@@ -150,6 +155,16 @@ class DashboardController(
         ResponseEntity.ok()
             .contentType(svgMediaType)
             .body(chartService.balanceByAccountTypeChartSvg(chartOptions(width, height, dpi)))
+
+    @GetMapping("/charts/monthly-position.svg", produces = ["image/svg+xml"])
+    fun monthlyPositionChart(
+        @RequestParam(required = false) width: Int?,
+        @RequestParam(required = false) height: Int?,
+        @RequestParam(required = false) dpi: Int?
+    ): ResponseEntity<String> =
+        ResponseEntity.ok()
+            .contentType(svgMediaType)
+            .body(chartService.monthlyPositionChartSvg(chartOptions(width, height, dpi)))
 
     private fun chartOptions(width: Int?, height: Int?, dpi: Int?) =
         ChartRenderOptions.from(width, height, dpi)

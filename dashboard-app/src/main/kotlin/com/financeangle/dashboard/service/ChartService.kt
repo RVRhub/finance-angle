@@ -97,6 +97,19 @@ class ChartService(
         return renderSvg(plot, options)
     }
 
+    fun monthlyPositionChartSvg(options: ChartRenderOptions = ChartRenderOptions()): String {
+        val comparisons = transactionService.compareMonthlyAccountPositions()
+        if (comparisons.isEmpty()) return emptySvg("No monthly positions yet", options)
+        val data = mapOf(
+            "month" to comparisons.map { it.month.toString() },
+            "netPosition" to comparisons.map { it.netPosition.amount.toDouble() }
+        )
+        val plot = letsPlot(data) { x = "month"; y = "netPosition" } +
+            geomLine() +
+            labs(title = "Monthly net position", x = "Month", y = "Assets + savings - debts (EUR)")
+        return renderSvg(plot, options)
+    }
+
     private fun renderSvg(plot: Plot, options: ChartRenderOptions): String {
         val tmp = Files.createTempFile("plot-", ".svg")
         ggsave(
