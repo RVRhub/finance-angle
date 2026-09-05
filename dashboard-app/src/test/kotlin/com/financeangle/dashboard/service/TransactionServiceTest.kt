@@ -114,14 +114,11 @@ class TransactionServiceTest {
             LocalDate.parse("2026-01-31"),
             LocalDate.parse("2026-02-28")
         )
-        assertThat(balances.netPosition).containsExactly(
-            BigDecimal("-7000"),
-            BigDecimal("-6500")
-        )
-        assertThat(balances.series.single { it.label == "Loan (loan)" }.values).containsExactly(
-            BigDecimal("-10000"),
-            BigDecimal("-10000")
-        )
+        assertThat(balances.netPosition[0]).isEqualByComparingTo("-7000")
+        assertThat(balances.netPosition[1]).isEqualByComparingTo("-6500")
+        val loanValues = balances.series.single { it.label == "Loan (loan)" }.values
+        assertThat(loanValues[0]!!).isEqualByComparingTo("-10000")
+        assertThat(loanValues[1]!!).isEqualByComparingTo("-10000")
     }
 
     private fun snapshot(date: String, account: String, type: AccountBalanceType, amount: String) {
