@@ -11,8 +11,8 @@ import com.financeangle.dashboard.model.SummaryPoint
 import com.financeangle.dashboard.model.TransactionRecord
 import com.financeangle.dashboard.model.TransactionRequest
 import com.financeangle.dashboard.model.AccountPositionSnapshotResponse
-import com.financeangle.dashboard.service.ChartRenderOptions
-import com.financeangle.dashboard.service.ChartService
+import com.financeangle.dashboard.model.DashboardData
+import com.financeangle.dashboard.service.DashboardDataService
 import com.financeangle.dashboard.service.TransactionService
 import jakarta.validation.Valid
 import org.springframework.http.MediaType
@@ -33,7 +33,7 @@ import org.springframework.web.multipart.MultipartFile
 @RequestMapping("/api")
 class DashboardController(
     private val transactionService: TransactionService,
-    private val chartService: ChartService
+    private val dashboardDataService: DashboardDataService
 ) {
 
     @PostMapping("/accounts")
@@ -96,6 +96,10 @@ class DashboardController(
     fun summary(@RequestParam(required = false) months: Int?): List<SummaryPoint> =
         transactionService.monthlyCategorySummary(months)
 
+    @GetMapping("/dashboard")
+    fun dashboard(@RequestParam(defaultValue = "12") months: Int): DashboardData =
+        dashboardDataService.getDashboardData(months)
+
     @PostMapping("/import/finanzguru", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
     fun importFinanzguru(
         @RequestPart("file") file: MultipartFile,
@@ -122,53 +126,6 @@ class DashboardController(
             accountColumn = accountColumn
         )
     }
-
-    private val svgMediaType = MediaType.parseMediaType("image/svg+xml")
-
-    @GetMapping("/charts/spending.svg", produces = ["image/svg+xml"])
-    fun spendingChart(
-        @RequestParam(required = false) width: Int?,
-        @RequestParam(required = false) height: Int?,
-        @RequestParam(required = false) dpi: Int?,
-        @RequestParam(defaultValue = "true") stacked: Boolean,
-        @RequestParam(required = false) months: Int?
-    ): ResponseEntity<String> =
-        ResponseEntity.ok()
-            .contentType(svgMediaType)
-            .body(chartService.spendingChartSvg(chartOptions(width, height, dpi), stacked, months))
-
-    @GetMapping("/charts/balance.svg", produces = ["image/svg+xml"])
-    fun balanceChart(
-        @RequestParam(required = false) width: Int?,
-        @RequestParam(required = false) height: Int?,
-        @RequestParam(required = false) dpi: Int?
-    ): ResponseEntity<String> =
-        ResponseEntity.ok()
-            .contentType(svgMediaType)
-            .body(chartService.balanceChartSvg(chartOptions(width, height, dpi)))
-
-    @GetMapping("/charts/balance-by-account.svg", produces = ["image/svg+xml"])
-    fun balanceByAccountTypeChart(
-        @RequestParam(required = false) width: Int?,
-        @RequestParam(required = false) height: Int?,
-        @RequestParam(required = false) dpi: Int?
-    ): ResponseEntity<String> =
-        ResponseEntity.ok()
-            .contentType(svgMediaType)
-            .body(chartService.balanceByAccountTypeChartSvg(chartOptions(width, height, dpi)))
-
-    @GetMapping("/charts/monthly-position.svg", produces = ["image/svg+xml"])
-    fun monthlyPositionChart(
-        @RequestParam(required = false) width: Int?,
-        @RequestParam(required = false) height: Int?,
-        @RequestParam(required = false) dpi: Int?
-    ): ResponseEntity<String> =
-        ResponseEntity.ok()
-            .contentType(svgMediaType)
-            .body(chartService.monthlyPositionChartSvg(chartOptions(width, height, dpi)))
-
-    private fun chartOptions(width: Int?, height: Int?, dpi: Int?) =
-        ChartRenderOptions.from(width, height, dpi)
 
     private fun com.financeangle.dashboard.model.AccountPositionSnapshotRecord.toResponse() =
         AccountPositionSnapshotResponse(
