@@ -26,8 +26,6 @@
 
     const charts = [];
     const amount = money => Number(money?.amount ?? 0);
-    const signedSnapshotAmount = snapshot =>
-        amount(snapshot.balance) * (snapshot.type === "CREDIT" || snapshot.type === "LOAN" ? -1 : 1);
     const formatMoney = value => eur.format(Number(value ?? 0));
     const axisMoney = value => {
         const absolute = Math.abs(value);
@@ -100,10 +98,9 @@
             </div>`;
     }
 
-    async function loadMonthlyPosition() {
+    function loadMonthlyPosition(rows) {
         const chart = createChart("monthly-position-chart");
         try {
-            const rows = await fetchJson("/api/account-positions/comparison");
             const body = document.getElementById("position-rows");
             const latest = document.getElementById("latest-position");
 
@@ -183,10 +180,9 @@
         }
     }
 
-    async function loadSpending() {
+    function loadSpending(rows) {
         const chart = createChart("spending-chart");
         try {
-            const rows = await fetchJson("/api/summary/spending?months=12");
             if (!rows.length) {
                 showMessage(chart, "No spending data yet");
                 return;
@@ -214,30 +210,20 @@
         }
     }
 
-    function groupSnapshots(snapshots) {
-        return snapshots.reduce((dates, snapshot) => {
-            const date = snapshot.date;
-            dates.set(date, (dates.get(date) ?? 0) + signedSnapshotAmount(snapshot));
-            return dates;
-        }, new Map());
-    }
-
-    async function loadBalances() {
+    function loadBalances(balances) {
         const balanceChart = createChart("balance-chart");
         const accountChart = createChart("account-chart");
         try {
-            const snapshots = await fetchJson("/api/snapshots");
-            if (!snapshots.length) {
+            if (!balances.dates.length) {
                 showMessage(balanceChart, "No balance snapshots yet");
                 showMessage(accountChart, "No balance snapshots yet");
                 return;
             }
 
-            const netByDate = [...groupSnapshots(snapshots).entries()].sort(([a], [b]) => a.localeCompare(b));
             balanceChart.hideLoading();
             balanceChart.setOption({
                 ...commonOption,
-                xAxis: { type: "category", boundaryGap: false, data: netByDate.map(([date]) => date) },
+                xAxis: { type: "category", boundaryGap: false, data: balances.dates },
                 series: [{
                     name: "Net position",
                     type: "line",
@@ -245,32 +231,24 @@
                     symbolSize: 7,
                     lineStyle: { width: 3 },
                     areaStyle: { opacity: 0.12 },
-                    data: netByDate.map(([, value]) => value),
+                    data: balances.netPosition,
                     markLine: { silent: true, symbol: "none", data: [{ yAxis: 0 }] }
                 }]
             });
-
-            const dates = [...new Set(snapshots.map(snapshot => snapshot.date))].sort();
-            const accountNames = [...new Set(snapshots.map(snapshot =>
-                `${snapshot.account || "Unassigned"} (${snapshot.type.toLowerCase()})`
-            ))].sort();
-            const values = new Map(snapshots.map(snapshot => [
-                `${snapshot.date}::${snapshot.account || "Unassigned"} (${snapshot.type.toLowerCase()})`,
-                signedSnapshotAmount(snapshot)
-            ]));
 
             accountChart.hideLoading();
             accountChart.setOption({
                 ...commonOption,
                 legend: { type: "scroll", top: 0, left: 0, right: 90 },
-                xAxis: { type: "category", boundaryGap: false, data: dates },
-                series: accountNames.map(name => ({
-                    name,
+                xAxis: { type: "category", boundaryGap: false, data: balances.dates },
+                series: balances.series.map(series => ({
+                    id: series.key,
+                    name: series.label,
                     type: "line",
                     connectNulls: true,
-                    showSymbol: dates.length < 24,
+                    showSymbol: balances.dates.length < 24,
                     emphasis: { focus: "series" },
-                    data: dates.map(date => values.get(`${date}::${name}`) ?? null)
+                    data: series.values
                 }))
             });
         } catch (error) {
@@ -279,6 +257,22 @@
         }
     }
 
+    async function loadDashboard() {
+        try {
+            const data = await fetchJson("/api/dashboard?months=12");
+            loadMonthlyPosition(data.monthlyPositions);
+            loadSpending(data.spending);
+            loadBalances(data.balances);
+        } catch (error) {
+            document.getElementById("position-rows").innerHTML =
+                `<tr><td colspan="6">Could not load dashboard: ${escapeHtml(error.message)}</td></tr>`;
+            ["monthly-position-chart", "spending-chart", "balance-chart", "account-chart"].forEach(id => {
+                const chart = createChart(id);
+                showMessage(chart, `Could not load dashboard: ${error.message}`);
+            });
+        }
+    }
+
     window.addEventListener("resize", () => charts.forEach(chart => chart.resize()));
-    Promise.allSettled([loadMonthlyPosition(), loadSpending(), loadBalances()]);
+    loadDashboard();
 })();
