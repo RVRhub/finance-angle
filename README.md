@@ -77,3 +77,7 @@ The repository now contains two modules: `backend/` (Spring Boot API) and `mcp-s
   DB_FILE=/path/to/iCloud/finance.db ./gradlew :dashboard-app:bootRun
   ```
 - Open the UI at `http://localhost:8090` for charts or `http://localhost:8090/swagger-ui.html` for CSV upload and manual entries.
+- Create or replace a historical monthly position with `POST /api/account-positions/monthly` and a body such as
+  `{"month":"2026-08","savingsBudget":{"amount":500,"currency":"EUR"}}`.
+- Compare assets, debts, savings, net position, and month-over-month changes at
+  `GET /api/account-positions/comparison`.

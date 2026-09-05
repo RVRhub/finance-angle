@@ -63,6 +63,7 @@ data class AccountSnapshotRequest(
 )
 
 data class MonthlyAccountPositionRequest(
+    val month: YearMonth = YearMonth.now(),
     val savingsBudget: MoneyAmount? = null
 )
 
@@ -116,6 +117,22 @@ data class SnapshotTotals(
     val totalLoans: MoneyAmount,
     val savingsBudget: MoneyAmount,
     val netPosition: MoneyAmount // totalDebit + totalSharedDebit + savingsBudget - totalCredit - totalLoans
+)
+
+data class MonthlyPositionComparison(
+    val month: YearMonth,
+    val assets: MoneyAmount,
+    val debts: MoneyAmount,
+    val savings: MoneyAmount,
+    val netPosition: MoneyAmount,
+    val change: MonthlyPositionChange
+)
+
+data class MonthlyPositionChange(
+    val assets: MoneyAmount?,
+    val debts: MoneyAmount?,
+    val savings: MoneyAmount?,
+    val netPosition: MoneyAmount?
 )
 
 data class MoneyAmount(

@@ -14,6 +14,8 @@ import com.financeangle.dashboard.model.FxRate
 import com.financeangle.dashboard.model.ImportResult
 import com.financeangle.dashboard.model.MoneyAmount
 import com.financeangle.dashboard.model.MonthlyAccountPositionRequest
+import com.financeangle.dashboard.model.MonthlyPositionChange
+import com.financeangle.dashboard.model.MonthlyPositionComparison
 import com.financeangle.dashboard.model.SnapshotRecord
 import com.financeangle.dashboard.model.SnapshotTotals
 import com.financeangle.dashboard.model.SummaryPoint
@@ -174,12 +176,20 @@ class TransactionService(
     }
 
     fun addMonthlyAccountPosition(request: MonthlyAccountPositionRequest): AccountPositionSnapshotRecord = transaction(database) {
-        val targetMonth = YearMonth.now()
+        val targetMonth = request.month
         val savingsBudget = request.savingsBudget ?: MoneyAmount(BigDecimal.ZERO, "EUR")
         val monthStart = targetMonth.atDay(1)
         val monthEnd = targetMonth.atEndOfMonth()
 
         // replace existing snapshot for the month to keep a single source of truth
+        val existingSnapshotIds = AccountPositionSnapshots.selectAll()
+            .where { AccountPositionSnapshots.snapshotMonth eq monthStart }
+            .map { it[AccountPositionSnapshots.id] }
+        existingSnapshotIds.forEach { snapshotId ->
+            AccountPositionSnapshotAccounts.deleteWhere {
+                AccountPositionSnapshotAccounts.snapshotId eq snapshotId
+            }
+        }
         AccountPositionSnapshots.deleteWhere { AccountPositionSnapshots.snapshotMonth eq monthStart }
 
         val accountsTable = Accounts.selectAll().associateBy { it[Accounts.id].value }
@@ -253,6 +263,28 @@ class TransactionService(
                 ?.map { asAccountSnapshot(it) }
                 .orEmpty()
             asAccountPositionSnapshotRecord(snapshot, accounts)
+        }
+    }
+
+    fun compareMonthlyAccountPositions(): List<MonthlyPositionComparison> {
+        val positions = listMonthlyAccountPositions().sortedBy { it.month }
+        return positions.mapIndexed { index, position ->
+            val previous = positions.getOrNull(index - 1)
+            val assets = position.totals.totalDebit + position.totals.totalSharedDebit
+            val debts = position.totals.totalCredit + position.totals.totalLoans
+            MonthlyPositionComparison(
+                month = position.month,
+                assets = assets,
+                debts = debts,
+                savings = position.savingsBudget,
+                netPosition = position.totals.netPosition,
+                change = MonthlyPositionChange(
+                    assets = previous?.let { assets - (it.totals.totalDebit + it.totals.totalSharedDebit) },
+                    debts = previous?.let { debts - (it.totals.totalCredit + it.totals.totalLoans) },
+                    savings = previous?.let { position.savingsBudget - it.savingsBudget },
+                    netPosition = previous?.let { position.totals.netPosition - it.totals.netPosition }
+                )
+            )
         }
     }
 
@@ -500,6 +532,16 @@ class TransactionService(
         val currency = values.first().currency
         val total = values.fold(BigDecimal.ZERO) { acc, money -> acc + money.amount }
         return MoneyAmount(total, currency)
+    }
+
+    private operator fun MoneyAmount.plus(other: MoneyAmount): MoneyAmount {
+        require(currency == other.currency) { "Cannot add $currency and ${other.currency}" }
+        return MoneyAmount(amount + other.amount, currency)
+    }
+
+    private operator fun MoneyAmount.minus(other: MoneyAmount): MoneyAmount {
+        require(currency == other.currency) { "Cannot subtract ${other.currency} from $currency" }
+        return MoneyAmount(amount - other.amount, currency)
     }
 
     private fun findAccount(accountId: String?, name: String): ResultRow? {
