@@ -146,6 +146,26 @@ data class SummaryPoint(
     val total: BigDecimal
 )
 
+data class DashboardData(
+    val monthlyPositions: List<MonthlyPositionComparison>,
+    val spending: List<SummaryPoint>,
+    val balances: DashboardBalanceData
+)
+
+data class DashboardBalanceData(
+    val currency: String = "EUR",
+    val dates: List<LocalDate>,
+    val netPosition: List<BigDecimal>,
+    val series: List<DashboardBalanceSeries>
+)
+
+data class DashboardBalanceSeries(
+    val key: String,
+    val label: String,
+    val type: AccountBalanceType,
+    val values: List<BigDecimal?>
+)
+
 data class ImportResult(
     val imported: Int,
     val skipped: Int,
