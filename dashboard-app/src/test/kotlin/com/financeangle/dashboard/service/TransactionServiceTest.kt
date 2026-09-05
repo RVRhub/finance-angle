@@ -102,6 +102,28 @@ class TransactionServiceTest {
         }
     }
 
+    @Test
+    fun `should prepare aligned balance series and carry forward unchanged accounts`() {
+        snapshot("2026-01-31", "Main", AccountBalanceType.DEBIT, "3000")
+        snapshot("2026-01-31", "Loan", AccountBalanceType.LOAN, "10000")
+        snapshot("2026-02-28", "Main", AccountBalanceType.DEBIT, "3500")
+
+        val balances = DashboardDataService(service).buildBalanceData(service.listSnapshots())
+
+        assertThat(balances.dates).containsExactly(
+            LocalDate.parse("2026-01-31"),
+            LocalDate.parse("2026-02-28")
+        )
+        assertThat(balances.netPosition).containsExactly(
+            BigDecimal("-7000"),
+            BigDecimal("-6500")
+        )
+        assertThat(balances.series.single { it.label == "Loan (loan)" }.values).containsExactly(
+            BigDecimal("-10000"),
+            BigDecimal("-10000")
+        )
+    }
+
     private fun snapshot(date: String, account: String, type: AccountBalanceType, amount: String) {
         service.addSnapshot(
             AccountBalanceSnapshotRequest(
