@@ -25,31 +25,30 @@ Finance Angle is a Kotlin + Spring Boot playground to capture daily spending, tr
 
 You can run the service, its Postgres dependency, and the MCP bridge via Docker Compose:
 
-1. Build and start Postgres + the Spring Boot API:
+1. Build and start Postgres + API:
    ```bash
    docker compose up --build db app
    ```
    The API becomes available on `http://localhost:8080` once Flyway migrates the schema.
-2. In a separate terminal you can open the logs or run disposable commands:
+2. In a separate terminal, open the logs:
    ```bash
    docker compose logs -f app
    ```
 
 ### MCP server for ChatGPT Dev Mode
 
-The repository now contains two modules: `backend/` (Spring Boot API) and `mcp-server/` (Kotlin MCP bridge). The `mcp-server/` module exposes Finance Angle APIs through the Model Context Protocol so ChatGPT Dev Mode can drive all interactions.
+The repository contains `backend/` (Spring Boot API) and `mcp-server/` (Kotlin MCP bridge). The MCP server exposes Finance Angle APIs through the Model Context Protocol.
 
-1. Build the bridge container (runs as needed by Compose):
+1. Build the bridge container:
    ```bash
    docker compose build mcp
    ```
-2. When configuring Dev Mode in ChatGPT, point the MCP server command to:
+2. Point the ChatGPT Dev Mode MCP command to:
    ```bash
    docker compose run --rm mcp
    ```
-   This command streams STDIO between ChatGPT and the MCP server while reusing the already running API container.
-3. Ensure `db` and `app` services are running before launching the MCP server so tool calls can reach `http://app:8080` inside the Compose network.
-4. For local debugging outside containers you can also run the bridge directly:
+3. Ensure `db` and `app` are running so the bridge can reach `http://app:8080`.
+4. For local debugging outside containers:
    ```bash
    ./gradlew :mcp-server:run
    ```
@@ -62,22 +61,46 @@ The repository now contains two modules: `backend/` (Spring Boot API) and `mcp-s
 - `GET /api/receipts/{externalId}` – check ingestion status.
 - `POST /api/savings/snapshots` – log current savings.
 - `GET /api/savings/snapshots/latest` – fetch the last savings snapshot.
-- `GET /api/insights/recommendations` – returns AI guidance (placeholder until configured).
+- `GET /api/insights/recommendations` – return AI guidance (placeholder until configured).
+
+## Dashboard app (SQLite + ECharts)
+
+Run the lightweight dashboard module with SQLite file storage:
+
+```bash
+DB_FILE=/path/to/iCloud/finance.db ./gradlew :dashboard-app:bootRun
+```
+
+Open:
+
+- `http://localhost:8090` for the interactive ECharts dashboard.
+- `http://localhost:8090/swagger-ui.html` for CSV upload and manual entries.
+
+The chart runtime is packaged locally as a WebJar, so the browser does not depend on a CDN. The dashboard reads JSON from:
+
+- `GET /api/account-positions/comparison`
+- `GET /api/summary/spending?months=12`
+- `GET /api/snapshots`
+
+Charts support responsive resizing, hover values, legend filtering, timeline zooming, reset, and image export.
+
+Create or replace a historical monthly position with `POST /api/account-positions/monthly` and a body such as:
+
+```json
+{
+  "month": "2026-08",
+  "savingsBudget": {
+    "amount": 500,
+    "currency": "EUR"
+  }
+}
+```
+
+The legacy `/api/charts/*.svg` endpoints remain available temporarily while consumers migrate.
 
 ## Next steps
 
 - Replace the `NoOpAiClient` with a real OpenAI implementation.
-- Wire ChatGPT voice/photo workflows to call the existing ingestion and transaction endpoints.
-- Extend the summary reporting with budgets, alerts, and prediction visualisations.
-
-## Dashboard app (SQLite + charts)
-
-- Run the lightweight dashboard module locally with SQLite file storage:
-  ```bash
-  DB_FILE=/path/to/iCloud/finance.db ./gradlew :dashboard-app:bootRun
-  ```
-- Open the UI at `http://localhost:8090` for charts or `http://localhost:8090/swagger-ui.html` for CSV upload and manual entries.
-- Create or replace a historical monthly position with `POST /api/account-positions/monthly` and a body such as
-  `{"month":"2026-08","savingsBudget":{"amount":500,"currency":"EUR"}}`.
-- Compare assets, debts, savings, net position, and month-over-month changes at
-  `GET /api/account-positions/comparison`.
+- Wire ChatGPT voice/photo workflows to the existing ingestion and transaction endpoints.
+- Add budgets, alerts, predictions, and richer dashboard filters.
+- Remove Lets-Plot and the legacy SVG endpoints after the ECharts migration is verified.

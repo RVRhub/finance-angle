@@ -93,7 +93,8 @@ class DashboardController(
         transactionService.compareMonthlyAccountPositions()
 
     @GetMapping("/summary/spending")
-    fun summary(): List<SummaryPoint> = transactionService.monthlyCategorySummary()
+    fun summary(@RequestParam(required = false) months: Int?): List<SummaryPoint> =
+        transactionService.monthlyCategorySummary(months)
 
     @PostMapping("/import/finanzguru", consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
     fun importFinanzguru(
