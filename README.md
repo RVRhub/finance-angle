@@ -76,11 +76,10 @@ Open:
 - `http://localhost:8090` for the interactive ECharts dashboard.
 - `http://localhost:8090/swagger-ui.html` for CSV upload and manual entries.
 
-The chart runtime is packaged locally as a WebJar, so the browser does not depend on a CDN. The dashboard reads JSON from:
-
-- `GET /api/account-positions/comparison`
-- `GET /api/summary/spending?months=12`
-- `GET /api/snapshots`
+The chart runtime is packaged locally as a WebJar, so the browser does not depend on a CDN.
+The dashboard reads a presentation-ready JSON model from `GET /api/dashboard?months=12`.
+Kotlin owns currency signs, account-series alignment, carry-forward balances, and net-position aggregation;
+ECharts only renders the returned data.
 
 Charts support responsive resizing, hover values, legend filtering, timeline zooming, reset, and image export.
 
@@ -96,11 +95,8 @@ Create or replace a historical monthly position with `POST /api/account-position
 }
 ```
 
-The legacy `/api/charts/*.svg` endpoints remain available temporarily while consumers migrate.
-
 ## Next steps
 
 - Replace the `NoOpAiClient` with a real OpenAI implementation.
 - Wire ChatGPT voice/photo workflows to the existing ingestion and transaction endpoints.
 - Add budgets, alerts, predictions, and richer dashboard filters.
-- Remove Lets-Plot and the legacy SVG endpoints after the ECharts migration is verified.
