@@ -33,6 +33,9 @@ dependencies {
     implementation("org.jetbrains.lets-plot:lets-plot-kotlin-jvm:4.6.0")
     implementation("org.jetbrains.lets-plot:lets-plot-batik:4.6.0")
 
+    // Locally packaged browser chart runtime; no CDN is required.
+    implementation("org.webjars.npm:echarts:5.6.0")
+
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
