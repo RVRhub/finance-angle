@@ -109,19 +109,24 @@ class TransactionServiceTest {
         snapshot("2026-02-28", "Main", AccountBalanceType.DEBIT, "3500")
 
         val balances = DashboardDataService(service).buildBalanceData(service.listSnapshots())
+        val numericBigDecimalComparator = Comparator<BigDecimal> { left, right -> left.compareTo(right) }
 
         assertThat(balances.dates).containsExactly(
             LocalDate.parse("2026-01-31"),
             LocalDate.parse("2026-02-28")
         )
-        assertThat(balances.netPosition).containsExactly(
-            BigDecimal("-7000"),
-            BigDecimal("-6500")
-        )
-        assertThat(balances.series.single { it.label == "Loan (loan)" }.values).containsExactly(
-            BigDecimal("-10000"),
-            BigDecimal("-10000")
-        )
+        assertThat(balances.netPosition)
+            .usingElementComparator(numericBigDecimalComparator)
+            .containsExactly(
+                BigDecimal("-7000"),
+                BigDecimal("-6500")
+            )
+        assertThat(balances.series.single { it.label == "Loan (loan)" }.values)
+            .usingElementComparator(numericBigDecimalComparator)
+            .containsExactly(
+                BigDecimal("-10000"),
+                BigDecimal("-10000")
+            )
     }
 
     private fun snapshot(date: String, account: String, type: AccountBalanceType, amount: String) {
