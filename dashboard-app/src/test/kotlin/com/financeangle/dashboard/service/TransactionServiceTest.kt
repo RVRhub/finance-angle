@@ -24,6 +24,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.time.LocalDate
 import java.time.YearMonth
+import java.util.Comparator
 
 class TransactionServiceTest {
 
@@ -116,13 +117,13 @@ class TransactionServiceTest {
             LocalDate.parse("2026-02-28")
         )
         assertThat(balances.netPosition)
-            .usingElementComparator(numericBigDecimalComparator)
+            .usingElementComparator(BigDecimal::compareTo)
             .containsExactly(
                 BigDecimal("-7000"),
                 BigDecimal("-6500")
             )
         assertThat(balances.series.single { it.label == "Loan (loan)" }.values)
-            .usingElementComparator(numericBigDecimalComparator)
+            .usingElementComparator(Comparator.nullsFirst(Comparator.naturalOrder()))
             .containsExactly(
                 BigDecimal("-10000"),
                 BigDecimal("-10000")
