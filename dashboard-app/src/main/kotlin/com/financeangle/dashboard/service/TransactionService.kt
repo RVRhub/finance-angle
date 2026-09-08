@@ -11,6 +11,8 @@ import com.financeangle.dashboard.model.AccountRequest
 import com.financeangle.dashboard.model.AccountSnapshot
 import com.financeangle.dashboard.model.Accounts
 import com.financeangle.dashboard.model.FxRate
+import com.financeangle.dashboard.model.ExpenseReductionAnalysis
+import com.financeangle.dashboard.model.ExpenseReductionOpportunity
 import com.financeangle.dashboard.model.ImportResult
 import com.financeangle.dashboard.model.MoneyAmount
 import com.financeangle.dashboard.model.MonthlyAccountPositionRequest
@@ -282,13 +284,16 @@ class TransactionService(
         }
     }
 
-    fun monthlyCategorySummary(monthsBack: Int? = null): List<SummaryPoint> {
+    fun monthlyCategorySummary(
+        monthsBack: Int? = null,
+        asOf: LocalDate = LocalDate.now()
+    ): List<SummaryPoint> {
         val transactions = transaction(database) {
             val excludedDescriptionPatterns = listOf("Sent from N26", "Roman", "Family")
             val query = Transactions.selectAll()
             if (monthsBack != null) {
                 require(monthsBack > 0) { "monthsBack must be positive" }
-                val endDate = LocalDate.now()
+                val endDate = asOf
                 val startDate = endDate.minusMonths(monthsBack.toLong() - 1).withDayOfMonth(1)
                 query.andWhere { Transactions.date.between(startDate, endDate) }
             }
@@ -330,6 +335,75 @@ class TransactionService(
             }
             .sortedWith(compareBy(SummaryPoint::month, SummaryPoint::category))
     }
+
+    /**
+     * Finds evidence-based reductions from up to two years of expense history. The latest three
+     * months are compared with the earlier baseline; suggestions recover half of a recent increase
+     * or five percent of stable spending, capped at fifteen percent of the category average.
+     */
+    fun analyzeExpenseReduction(
+        monthsBack: Int = 24,
+        asOf: LocalDate = LocalDate.now()
+    ): ExpenseReductionAnalysis {
+        require(monthsBack in 12..24) { "months must be between 12 and 24" }
+        val endMonth = YearMonth.from(asOf)
+        val startMonth = endMonth.minusMonths(monthsBack.toLong() - 1)
+        val points = monthlyCategorySummary(monthsBack, asOf)
+        val monthsWithData = points.map(SummaryPoint::month).distinct().sorted()
+        val recentMonths = monthsWithData.takeLast(3)
+        val historicalMonths = monthsWithData.dropLast(recentMonths.size)
+        val totalsByMonth = points.groupBy(SummaryPoint::month)
+            .mapValues { (_, values) -> values.sumOf(SummaryPoint::total) }
+        val averageMonthlyExpenses = average(totalsByMonth.values.toList())
+        val recentMonthlyExpenses = average(recentMonths.map { totalsByMonth[it] ?: BigDecimal.ZERO })
+
+        val categories = points.mapNotNull(SummaryPoint::category).distinct()
+        val opportunities = categories.mapNotNull { category ->
+            val totals = points.filter { it.category == category }.associate { it.month to it.total }
+            val recentAverage = average(recentMonths.map { totals[it] ?: BigDecimal.ZERO })
+            if (recentAverage.signum() == 0) return@mapNotNull null
+            val historicalAverage = if (historicalMonths.isEmpty()) {
+                average(monthsWithData.map { totals[it] ?: BigDecimal.ZERO })
+            } else {
+                average(historicalMonths.map { totals[it] ?: BigDecimal.ZERO })
+            }
+            val increase = (recentAverage - historicalAverage).coerceAtLeast(BigDecimal.ZERO)
+            val recovery = increase.multiply(BigDecimal("0.50"))
+            val steadyReduction = recentAverage.multiply(BigDecimal("0.05"))
+            val cap = recentAverage.multiply(BigDecimal("0.15"))
+            val suggestedReduction = recovery.max(steadyReduction).min(cap).money()
+            val changePercent = if (historicalAverage.signum() == 0) null else
+                increase.divide(historicalAverage, 4, RoundingMode.HALF_UP)
+                    .multiply(BigDecimal("100")).setScale(1, RoundingMode.HALF_UP)
+            ExpenseReductionOpportunity(
+                category = category,
+                recentMonthlyAverage = recentAverage.money(),
+                historicalMonthlyAverage = historicalAverage.money(),
+                changePercent = changePercent,
+                suggestedMonthlyReduction = suggestedReduction,
+                reason = if (increase.signum() > 0) {
+                    "Recent spending is above your earlier monthly average"
+                } else {
+                    "A small reduction in a consistently high-spend category"
+                }
+            )
+        }.sortedByDescending(ExpenseReductionOpportunity::suggestedMonthlyReduction).take(5)
+
+        return ExpenseReductionAnalysis(
+            analysisStart = startMonth,
+            analysisEnd = endMonth,
+            monthsWithData = monthsWithData.size,
+            averageMonthlyExpenses = averageMonthlyExpenses.money(),
+            recentMonthlyExpenses = recentMonthlyExpenses.money(),
+            potentialMonthlySavings = opportunities.sumOf(ExpenseReductionOpportunity::suggestedMonthlyReduction).money(),
+            opportunities = opportunities
+        )
+    }
+
+    private fun average(values: List<BigDecimal>): BigDecimal = if (values.isEmpty()) BigDecimal.ZERO else
+        values.sumOf { it }.divide(values.size.toBigDecimal(), 8, RoundingMode.HALF_UP)
+
+    private fun BigDecimal.money(): BigDecimal = setScale(2, RoundingMode.HALF_UP)
 
     private data class SummaryTransactionKey(
         val date: LocalDate,
