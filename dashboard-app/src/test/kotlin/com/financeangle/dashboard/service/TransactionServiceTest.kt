@@ -11,6 +11,7 @@ import com.financeangle.dashboard.model.Accounts
 import com.financeangle.dashboard.model.MoneyAmount
 import com.financeangle.dashboard.model.MonthlyAccountPositionRequest
 import com.financeangle.dashboard.model.Transactions
+import com.financeangle.dashboard.model.TransactionRequest
 import org.assertj.core.api.Assertions.assertThat
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
@@ -130,6 +131,56 @@ class TransactionServiceTest {
             )
     }
 
+    @Test
+    fun `should summarize spending as positive expense totals by category`() {
+        transaction("2026-01-05", "Groceries", "-12.34")
+        transaction("2026-01-12", "Groceries", "-7.66")
+        transaction("2026-01-20", "Groceries", "100.00")
+        transaction("2026-01-25", null, "-5.25")
+        transaction("2026-02-01", "Groceries", "-3.10")
+
+        val summary = service.monthlyCategorySummary()
+
+        assertThat(summary).hasSize(3)
+        assertThat(summary[0].month).isEqualTo(YearMonth.parse("2026-01"))
+        assertThat(summary[0].category).isEqualTo("Groceries")
+        assertThat(summary[0].total).isEqualByComparingTo("20.00")
+        assertThat(summary[1].month).isEqualTo(YearMonth.parse("2026-01"))
+        assertThat(summary[1].category).isEqualTo("Uncategorised")
+        assertThat(summary[1].total).isEqualByComparingTo("5.25")
+        assertThat(summary[2].month).isEqualTo(YearMonth.parse("2026-02"))
+        assertThat(summary[2].category).isEqualTo("Groceries")
+        assertThat(summary[2].total).isEqualByComparingTo("3.10")
+    }
+
+    @Test
+    fun `should prefer categorized copy when an import was duplicated without categories`() {
+        repeat(2) { transaction("2026-01-05", null, "-12.34") }
+        repeat(2) { transaction("2026-01-05", "Groceries", "-12.34") }
+
+        val summary = service.monthlyCategorySummary()
+
+        assertThat(summary).hasSize(1)
+        assertThat(summary.single().category).isEqualTo("Groceries")
+        assertThat(summary.single().total).isEqualByComparingTo("12.34")
+    }
+
+    @Test
+    fun `should import the category from current Finanzguru headers`() {
+        val csv = """
+            Buchungstag;Referenzkonto;Kontostand;Betrag;Verwendungszweck;Analyse-Hauptkategorie;Analyse-Unterkategorie
+            05.01.2026;main;1,000.00;-12.34;Supermarket;Lebenshaltung;Lebensmittel
+        """.trimIndent()
+
+        val result = service.importFinanzguru(csv.toByteArray())
+        val importedTransaction = service.listTransactions().single()
+
+        assertThat(result.imported).isEqualTo(1)
+        assertThat(result.errors).isEmpty()
+        assertThat(importedTransaction.category).isEqualTo("Lebenshaltung")
+        assertThat(importedTransaction.account).isEqualTo("main")
+    }
+
     private fun snapshot(date: String, account: String, type: AccountBalanceType, amount: String) {
         service.addSnapshot(
             AccountBalanceSnapshotRequest(
@@ -138,6 +189,17 @@ class TransactionServiceTest {
                 kind = if (type == AccountBalanceType.LOAN) AccountKind.LOAN else AccountKind.CHECKING,
                 account = account,
                 original = MoneyAmount(BigDecimal(amount), "EUR")
+            )
+        )
+    }
+
+    private fun transaction(date: String, category: String?, amount: String) {
+        service.addTransaction(
+            TransactionRequest(
+                date = LocalDate.parse(date),
+                description = "Test transaction",
+                category = category,
+                amount = BigDecimal(amount)
             )
         )
     }

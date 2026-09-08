@@ -28,8 +28,6 @@ dependencies {
 
     implementation("com.github.doyaaaaaken:kotlin-csv-jvm:1.9.2")
 
-    implementation("org.jetbrains.kotlinx:dataframe:0.13.1")
-
     // Locally packaged browser chart runtime; no CDN is required.
     implementation("org.webjars.npm:echarts:5.6.0")
 

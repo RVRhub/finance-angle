@@ -24,18 +24,12 @@ import com.financeangle.dashboard.model.TransactionRequest
 import com.financeangle.dashboard.model.Transactions
 import com.github.doyaaaaaken.kotlincsv.dsl.csvReader
 import org.springframework.stereotype.Service
-import org.jetbrains.kotlinx.dataframe.api.add
-import org.jetbrains.kotlinx.dataframe.api.groupBy
-import org.jetbrains.kotlinx.dataframe.api.isEmpty
-import org.jetbrains.kotlinx.dataframe.api.rows
-import org.jetbrains.kotlinx.dataframe.api.sortBy
-import org.jetbrains.kotlinx.dataframe.api.sum
-import org.jetbrains.kotlinx.dataframe.api.toDataFrame
 import org.jetbrains.exposed.dao.id.EntityID
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SortOrder
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
 import org.jetbrains.exposed.sql.andWhere
 import org.jetbrains.exposed.sql.deleteAll
 import org.jetbrains.exposed.sql.deleteWhere
@@ -298,38 +292,51 @@ class TransactionService(
                 val startDate = endDate.minusMonths(monthsBack.toLong() - 1).withDayOfMonth(1)
                 query.andWhere { Transactions.date.between(startDate, endDate) }
             }
+            query.andWhere { Transactions.amount less BigDecimal.ZERO }
             excludedDescriptionPatterns.forEach { pattern ->
                 query.andWhere { Transactions.description notLike "%$pattern%" }
             }
             query.orderBy(Transactions.date to SortOrder.ASC).map { asTransactionRecord(it) }
         }
 
-        val df = transactions.toDataFrame()
-        if (df.isEmpty()) return emptyList()
-
-        val summary = df
-            .add("month") { YearMonth.from(it["date"] as LocalDate) }
-            .add("categorySafe") { (it["category"] as String?) ?: "Uncategorised" }
-            .add("amountDouble") { (it["amount"] as BigDecimal).toDouble() }
-            .groupBy("month", "categorySafe")
-            .aggregate {
-                sum("amountDouble") into "total"
+        val categoryResolvedTransactions = transactions
+            .groupBy { transaction ->
+                SummaryTransactionKey(
+                    date = transaction.date,
+                    description = transaction.description,
+                    amount = transaction.amount,
+                    account = transaction.account
+                )
             }
-            .sortBy("month", "categorySafe")
-
-        return summary.rows().map { row ->
-            val totalValue = when (val value = row["total"]) {
-                is Double -> value
-                is Number -> value.toDouble()
-                else -> 0.0
+            .flatMap { (_, matchingTransactions) ->
+                val categorizedTransactions = matchingTransactions.filterNot { it.category.isNullOrBlank() }
+                if (categorizedTransactions.isNotEmpty() && categorizedTransactions.size < matchingTransactions.size) {
+                    listOf(categorizedTransactions.first())
+                } else {
+                    matchingTransactions
+                }
             }
-            SummaryPoint(
-                month = row["month"] as YearMonth,
-                category = row["categorySafe"] as String,
-                total = BigDecimal.valueOf(totalValue)
-            )
-        }
+
+        return categoryResolvedTransactions
+            .groupBy { YearMonth.from(it.date) to (it.category ?: "Uncategorised") }
+            .map { (monthAndCategory, categoryTransactions) ->
+                SummaryPoint(
+                    month = monthAndCategory.first,
+                    category = monthAndCategory.second,
+                    total = categoryTransactions.fold(BigDecimal.ZERO) { total, transaction ->
+                        total - transaction.amount
+                    }
+                )
+            }
+            .sortedWith(compareBy(SummaryPoint::month, SummaryPoint::category))
     }
+
+    private data class SummaryTransactionKey(
+        val date: LocalDate,
+        val description: String,
+        val amount: BigDecimal,
+        val account: String?
+    )
 
     fun importFinanzguru(
         bytes: ByteArray,
@@ -356,8 +363,16 @@ class TransactionService(
                 val amount = parseAmount(row[amountColumn], decimalComma)
                 val accountState = parseAmount(row[accountStateColumn], decimalComma)
                 val description = row[descriptionColumn] ?: ""
-                val category = row[categoryColumn]
-                val account = row[accountColumn]
+                val category = findColumnValue(
+                    row,
+                    categoryColumn,
+                    "Analyse-Hauptkategorie",
+                    "Analyse-Unterkategorie",
+                    "Hauptkategorie",
+                    "Unterkategorie",
+                    "Category"
+                )
+                val account = findColumnValue(row, accountColumn, "Referenzkonto", "Konto")
                 addTransaction(
                     TransactionRequest(
                         date = date,
@@ -374,6 +389,18 @@ class TransactionService(
             }
         }
         return ImportResult(imported = imported, skipped = rows.size - imported, errors = errors)
+    }
+
+    private fun findColumnValue(row: Map<String, String>, vararg columnNames: String): String? {
+        return columnNames.firstNotNullOfOrNull { columnName ->
+            row.entries
+                .firstOrNull { (header, _) ->
+                    header.removePrefix("\uFEFF").trim().equals(columnName.trim(), ignoreCase = true)
+                }
+                ?.value
+                ?.trim()
+                ?.takeIf(String::isNotEmpty)
+        }
     }
 
     private fun resolveAccountByName(name: String?): EntityID<Int>? {
