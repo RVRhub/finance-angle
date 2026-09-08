@@ -1,37 +1,28 @@
-# Repository Guidelines
+# Finance Angle Agent Rules
 
-## Project Structure & Module Organization
-- `backend/` is the Spring Boot API (Kotlin); controllers/services live in `src/main/kotlin`, configuration in `application.yml`, and Flyway migrations in `src/main/resources/db/migration`.
-- `backend/src/test/kotlin` holds integration and unit tests using H2 and Spring Boot testing utilities.
-- `mcp-server/` is the Ktor-based MCP bridge exposing Finance Angle APIs; code is in `src/main/kotlin` and tests in `src/test/kotlin` with MockWebServer fixtures.
-- `docker-compose.yml` connects Postgres (`db`), the API (`app`), and the MCP server (`mcp`); the shared Gradle wrapper sits at the repo root.
+These rules apply to all AI-assisted changes in this repository.
 
-## Build, Test, and Development Commands
-- `./gradlew clean build` – compile all modules and run their tests.
-- `./gradlew :backend:bootRun` – start the API locally (requires datasource env vars).
-- `./gradlew :mcp-server:run` – run the MCP server against a running API.
-- `docker compose up --build db app` – launch Postgres + API containers; schema auto-migrated via Flyway.
-- `docker compose run --rm mcp` – start the MCP bridge within the Compose network.
-- `docker compose logs -f app` – follow application logs while iterating.
+## Global workflow
+- Work on a feature/fix/chore branch; never push AI-generated feature work directly to `main`.
+- Keep each change focused on one feature or fix. Avoid unrelated refactoring.
+- Inspect the relevant implementation and tests before editing behavior.
+- Prefer existing project patterns over new abstractions, libraries, plugins, or services.
+- Preserve public API and persisted-data compatibility unless the requested change explicitly requires otherwise.
+- Never commit credentials, tokens, private keys, or real customer data.
 
-## Coding Style & Naming Conventions
-- Kotlin with 4-space indentation; keep idiomatic null-safety and data classes for payloads/records.
-- Package names are lowercase dot-separated; classes/objects use PascalCase, functions/fields use camelCase, constants use uppercase snake_case.
-- Keep controllers thin, move business logic into services, and validate request DTOs with javax validation annotations in the API module.
-- Favor small, single-purpose functions and clear constructor injection.
+## Quality gates
+- Add or update tests for business logic, financial calculations, persistence behavior, API behavior, and bug fixes.
+- Run the narrowest relevant tests while iterating and `./gradlew test` before declaring a PR ready when the environment allows it.
+- Never claim checks passed unless they were actually executed.
+- Review the final diff for accidental, generated, or unrelated changes.
+- Keep PRs small when practical. If a change grows beyond roughly 5 files or 400 changed lines, split it or explain the scope.
 
-## Testing Guidelines
-- Backend tests use JUnit 5 + Spring Boot testing + H2; name files `*Test.kt` and prefer descriptive `fun should...()` methods.
-- MCP tests rely on `kotlin.test` and `MockWebServer`; keep network calls under test predictable with recorded fixtures.
-- Run all tests via `./gradlew test`; target a module with `./gradlew :backend:test` or `./gradlew :mcp-server:test`.
-- Add regression tests alongside new endpoints or MCP tools to lock behavior before refactoring.
+## Pull requests
+- PRs must state scope, testing evidence, risk, API/database impact, and known limitations.
+- Treat financial calculations, database migrations, authentication/authorization, and public API contracts as high-risk changes requiring explicit human review before merge.
 
-## Commit & Pull Request Guidelines
-- Commit messages follow short, imperative summaries (e.g., “Fix MCP connection to ChatGPT”); group related changes and include schema or config context when relevant.
-- PRs should state scope, testing performed, and any required env vars or migrations; for API updates, include sample requests/responses and note new endpoints.
-- Keep diffs focused, update README/docs when workflow steps change, and ensure Compose + Gradle commands still succeed.
-
-## Security & Configuration Tips
-- Never commit credentials; supply `SPRING_DATASOURCE_URL/USERNAME/PASSWORD` locally or rely on Compose defaults. For MCP, configure `FINANCE_ANGLE_BASE_URL` when not using Compose.
-- Flyway runs on startup; verify migrations match Postgres version (15) and avoid destructive changes without backups.
-- Use docker volume `postgres-data` only for local persistence; drop/recreate carefully if schema resets are needed.
+## Module-specific rules
+Read the nearest module `AGENTS.md` before changing code in that module:
+- `backend/AGENTS.md`
+- `dashboard-app/AGENTS.md`
+- `mcp-server/AGENTS.md`

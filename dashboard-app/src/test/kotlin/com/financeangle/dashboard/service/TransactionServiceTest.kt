@@ -110,6 +110,7 @@ class TransactionServiceTest {
         snapshot("2026-02-28", "Main", AccountBalanceType.DEBIT, "3500")
 
         val balances = DashboardDataService(service).buildBalanceData(service.listSnapshots())
+        val numericBigDecimalComparator = Comparator<BigDecimal> { left, right -> left.compareTo(right) }
 
         assertThat(balances.dates).containsExactly(
             LocalDate.parse("2026-01-31"),
