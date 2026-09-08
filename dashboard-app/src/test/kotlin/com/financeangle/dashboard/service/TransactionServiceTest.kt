@@ -181,6 +181,37 @@ class TransactionServiceTest {
         assertThat(importedTransaction.account).isEqualTo("main")
     }
 
+    @Test
+    fun `should identify realistic monthly reductions from expense history`() {
+        (1..9).forEach { month ->
+            transaction("2025-${month.toString().padStart(2, '0')}-05", "Restaurants", "-100.00")
+            transaction("2025-${month.toString().padStart(2, '0')}-06", "Groceries", "-300.00")
+        }
+        (10..12).forEach { month ->
+            transaction("2025-$month-05", "Restaurants", "-160.00")
+            transaction("2025-$month-06", "Groceries", "-300.00")
+        }
+
+        val analysis = service.analyzeExpenseReduction(12, LocalDate.parse("2025-12-31"))
+
+        assertThat(analysis.monthsWithData).isEqualTo(12)
+        assertThat(analysis.averageMonthlyExpenses).isEqualByComparingTo("415.00")
+        assertThat(analysis.recentMonthlyExpenses).isEqualByComparingTo("460.00")
+        assertThat(analysis.potentialMonthlySavings).isEqualByComparingTo("39.00")
+        assertThat(analysis.opportunities.map { it.category }).containsExactly("Restaurants", "Groceries")
+        assertThat(analysis.opportunities[0].historicalMonthlyAverage).isEqualByComparingTo("100.00")
+        assertThat(analysis.opportunities[0].recentMonthlyAverage).isEqualByComparingTo("160.00")
+        assertThat(analysis.opportunities[0].suggestedMonthlyReduction).isEqualByComparingTo("24.00")
+        assertThat(analysis.opportunities[0].changePercent).isEqualByComparingTo("60.0")
+    }
+
+    @Test
+    fun `should require between twelve and twenty four months for expense analysis`() {
+        org.assertj.core.api.Assertions.assertThatThrownBy { service.analyzeExpenseReduction(6) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessage("months must be between 12 and 24")
+    }
+
     private fun snapshot(date: String, account: String, type: AccountBalanceType, amount: String) {
         service.addSnapshot(
             AccountBalanceSnapshotRequest(
