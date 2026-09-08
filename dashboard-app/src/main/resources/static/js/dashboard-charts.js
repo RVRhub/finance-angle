@@ -25,6 +25,8 @@
     });
 
     const charts = [];
+    const chartsById = new Map();
+    let fullscreenCard = null;
     const amount = money => Number(money?.amount ?? 0);
     const formatMoney = value => eur.format(Number(value ?? 0));
     const axisMoney = value => {
@@ -45,7 +47,59 @@
         const chart = echarts.init(element, "finance-angle", { renderer: "canvas" });
         chart.showLoading("default", { text: "Loading…" });
         charts.push(chart);
+        chartsById.set(elementId, chart);
         return chart;
+    }
+
+    function resizeChart(elementId) {
+        const chart = chartsById.get(elementId);
+        if (chart) requestAnimationFrame(() => chart.resize());
+    }
+
+    function closeFullscreen() {
+        if (!fullscreenCard) return;
+
+        const button = fullscreenCard.querySelector(".chart-fullscreen-toggle");
+        const chartId = button?.dataset.chartTarget;
+        fullscreenCard.classList.remove("chart-fullscreen");
+        document.body.classList.remove("chart-fullscreen-open");
+        if (button) {
+            button.textContent = "⛶";
+            button.setAttribute("aria-pressed", "false");
+            button.setAttribute("aria-label", button.dataset.openLabel);
+            button.focus();
+        }
+        fullscreenCard = null;
+        if (chartId) resizeChart(chartId);
+    }
+
+    function openFullscreen(button) {
+        const card = button.closest(".chart-card");
+        const chartId = button.dataset.chartTarget;
+        if (!card || !chartId) return;
+
+        if (fullscreenCard && fullscreenCard !== card) closeFullscreen();
+        fullscreenCard = card;
+        card.classList.add("chart-fullscreen");
+        document.body.classList.add("chart-fullscreen-open");
+        button.textContent = "×";
+        button.setAttribute("aria-pressed", "true");
+        button.setAttribute("aria-label", "Close fullscreen chart");
+        resizeChart(chartId);
+    }
+
+    function setupFullscreenControls() {
+        document.querySelectorAll(".chart-fullscreen-toggle").forEach(button => {
+            button.dataset.openLabel = button.getAttribute("aria-label") || "Open chart in fullscreen";
+            button.addEventListener("click", () => {
+                if (button.closest(".chart-card") === fullscreenCard) closeFullscreen();
+                else openFullscreen(button);
+            });
+        });
+
+        document.addEventListener("keydown", event => {
+            if (event.key === "Escape" && fullscreenCard) closeFullscreen();
+        });
     }
 
     function showMessage(chart, message) {
@@ -274,5 +328,6 @@
     }
 
     window.addEventListener("resize", () => charts.forEach(chart => chart.resize()));
+    setupFullscreenControls();
     loadDashboard();
 })();
