@@ -24,6 +24,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.time.LocalDate
 import java.time.YearMonth
+import java.util.Comparator
 
 class TransactionServiceTest {
 
@@ -114,14 +115,18 @@ class TransactionServiceTest {
             LocalDate.parse("2026-01-31"),
             LocalDate.parse("2026-02-28")
         )
-        assertThat(balances.netPosition).containsExactly(
-            BigDecimal("-7000"),
-            BigDecimal("-6500")
-        )
-        assertThat(balances.series.single { it.label == "Loan (loan)" }.values).containsExactly(
-            BigDecimal("-10000"),
-            BigDecimal("-10000")
-        )
+        assertThat(balances.netPosition)
+            .usingElementComparator(BigDecimal::compareTo)
+            .containsExactly(
+                BigDecimal("-7000"),
+                BigDecimal("-6500")
+            )
+        assertThat(balances.series.single { it.label == "Loan (loan)" }.values)
+            .usingElementComparator(Comparator.nullsFirst(Comparator.naturalOrder()))
+            .containsExactly(
+                BigDecimal("-10000"),
+                BigDecimal("-10000")
+            )
     }
 
     private fun snapshot(date: String, account: String, type: AccountBalanceType, amount: String) {
