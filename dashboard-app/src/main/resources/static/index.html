@@ -127,6 +127,8 @@
         .metric-value { font-size: 24px; font-weight: 700; margin-top: 6px; }
         .positive { color: var(--positive); }
         .negative { color: var(--negative); }
+        .insight-summary { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 14px; }
+        .insight-callout { color: var(--positive); font-size: 28px; font-weight: 750; }
         .table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
         table { border-collapse: collapse; width: 100%; }
         th, td { border-bottom: 1px solid var(--line); padding: 11px 13px; text-align: left; white-space: nowrap; }
@@ -171,6 +173,29 @@
                 </thead>
                 <tbody id="position-rows">
                 <tr><td colspan="6">Loading monthly positions…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="section" aria-labelledby="expense-analysis-title">
+        <h2 id="expense-analysis-title">Expense Reduction Plan</h2>
+        <p class="intro">Uses 12–24 months of your own spending history to find achievable monthly reductions.</p>
+        <div id="expense-analysis-summary" class="insight-summary" aria-live="polite">Loading expense analysis…</div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Earlier average</th>
+                    <th>Recent average</th>
+                    <th>Change</th>
+                    <th>Suggested reduction</th>
+                    <th>Why</th>
+                </tr>
+                </thead>
+                <tbody id="expense-opportunity-rows">
+                <tr><td colspan="6">Loading opportunities…</td></tr>
                 </tbody>
             </table>
         </div>

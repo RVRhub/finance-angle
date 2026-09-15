@@ -12,6 +12,7 @@ import com.financeangle.dashboard.model.TransactionRecord
 import com.financeangle.dashboard.model.TransactionRequest
 import com.financeangle.dashboard.model.AccountPositionSnapshotResponse
 import com.financeangle.dashboard.model.DashboardData
+import com.financeangle.dashboard.model.ExpenseReductionAnalysis
 import com.financeangle.dashboard.service.DashboardDataService
 import com.financeangle.dashboard.service.TransactionService
 import jakarta.validation.Valid
@@ -95,6 +96,10 @@ class DashboardController(
     @GetMapping("/summary/spending")
     fun summary(@RequestParam(required = false) months: Int?): List<SummaryPoint> =
         transactionService.monthlyCategorySummary(months)
+
+    @GetMapping("/insights/expense-reduction")
+    fun expenseReduction(@RequestParam(defaultValue = "24") months: Int): ExpenseReductionAnalysis =
+        transactionService.analyzeExpenseReduction(months)
 
     @GetMapping("/dashboard")
     fun dashboard(@RequestParam(defaultValue = "12") months: Int): DashboardData =

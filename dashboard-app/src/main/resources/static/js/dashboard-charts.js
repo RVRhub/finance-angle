@@ -311,6 +311,38 @@
         }
     }
 
+    function loadExpenseAnalysis(analysis) {
+        const summary = document.getElementById("expense-analysis-summary");
+        const body = document.getElementById("expense-opportunity-rows");
+        if (!analysis.monthsWithData) {
+            summary.textContent = "Import at least a few months of expenses to create a reduction plan.";
+            body.innerHTML = '<tr><td colspan="6">No expense history available.</td></tr>';
+            return;
+        }
+
+        summary.innerHTML = `
+            <div><span class="insight-callout">${formatMoney(analysis.potentialMonthlySavings)}</span><br>
+            <span class="note">potential savings per month</span></div>
+            <div class="note">Based on ${analysis.monthsWithData} months with data (${escapeHtml(analysis.analysisStart)}–${escapeHtml(analysis.analysisEnd)}).<br>
+            Recent monthly expenses: ${formatMoney(analysis.recentMonthlyExpenses)}; overall average: ${formatMoney(analysis.averageMonthlyExpenses)}.</div>`;
+
+        if (!analysis.opportunities.length) {
+            body.innerHTML = '<tr><td colspan="6">No reduction opportunities found yet.</td></tr>';
+            return;
+        }
+        body.innerHTML = analysis.opportunities.map(item => {
+            const change = item.changePercent === null ? "New" : `${Number(item.changePercent).toFixed(1)}%`;
+            return `<tr>
+                <td>${escapeHtml(item.category)}</td>
+                <td>${formatMoney(item.historicalMonthlyAverage)}</td>
+                <td>${formatMoney(item.recentMonthlyAverage)}</td>
+                <td>${change}</td>
+                <td class="positive">${formatMoney(item.suggestedMonthlyReduction)}</td>
+                <td>${escapeHtml(item.reason)}</td>
+            </tr>`;
+        }).join("");
+    }
+
     async function loadDashboard() {
         try {
             const data = await fetchJson("/api/dashboard?months=12");
@@ -327,7 +359,19 @@
         }
     }
 
+    async function loadExpenseReduction() {
+        try {
+            loadExpenseAnalysis(await fetchJson("/api/insights/expense-reduction?months=24"));
+        } catch (error) {
+            document.getElementById("expense-analysis-summary").textContent =
+                `Could not load expense analysis: ${error.message}`;
+            document.getElementById("expense-opportunity-rows").innerHTML =
+                `<tr><td colspan="6">Could not load opportunities: ${escapeHtml(error.message)}</td></tr>`;
+        }
+    }
+
     window.addEventListener("resize", () => charts.forEach(chart => chart.resize()));
     setupFullscreenControls();
     loadDashboard();
+    loadExpenseReduction();
 })();

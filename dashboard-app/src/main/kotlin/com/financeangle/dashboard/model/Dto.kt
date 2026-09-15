@@ -146,6 +146,25 @@ data class SummaryPoint(
     val total: BigDecimal
 )
 
+data class ExpenseReductionAnalysis(
+    val analysisStart: YearMonth,
+    val analysisEnd: YearMonth,
+    val monthsWithData: Int,
+    val averageMonthlyExpenses: BigDecimal,
+    val recentMonthlyExpenses: BigDecimal,
+    val potentialMonthlySavings: BigDecimal,
+    val opportunities: List<ExpenseReductionOpportunity>
+)
+
+data class ExpenseReductionOpportunity(
+    val category: String,
+    val recentMonthlyAverage: BigDecimal,
+    val historicalMonthlyAverage: BigDecimal,
+    val changePercent: BigDecimal?,
+    val suggestedMonthlyReduction: BigDecimal,
+    val reason: String
+)
+
 data class DashboardData(
     val monthlyPositions: List<MonthlyPositionComparison>,
     val spending: List<SummaryPoint>,
